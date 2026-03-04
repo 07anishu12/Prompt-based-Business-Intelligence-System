@@ -580,18 +580,7 @@ class ConnectionRead(BaseModel):
 
 ---
 
-## 10. Development Phases
-
-| Phase | Duration | Deliverables |
-|---|---|---|
-| **Phase 1: Foundation** | Week 1-2 | Scaffolding, DB models, auth, Postgres connector, basic prompt engine |
-| **Phase 2: Core BI** | Week 3-4 | Full prompt engine, all chart types, dashboard canvas, widget CRUD |
-| **Phase 3: Data Sources** | Week 5-6 | CSV/Excel/JSON/Google Drive connectors, file upload, connection UI |
-| **Phase 4: Polish** | Week 7-8 | Dark mode, export, sharing, responsive, Docker deployment, testing |
-
----
-
-## 11. Data Flow: Prompt to Dashboard Widget
+## 10. Data Flow: Prompt to Dashboard Widget
 
 ```
 User types: "Show top 10 customers by revenue as a bar chart"
@@ -629,3 +618,4 @@ User types: "Show top 10 customers by revenue as a bar chart"
   │
   └─ Frontend receives widget → renders BarChart on canvas
 ```
+
