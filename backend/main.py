@@ -7,7 +7,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from jose import JWTError, jwt
 from loguru import logger
 
+from pydantic import ValidationError
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+
 from backend.config import settings
+from backend.middleware.error_handler import (
+    generic_error_handler,
+    rate_limit_handler,
+    validation_error_handler,
+)
+from backend.middleware.rate_limiter import limiter
 
 # ── Constants ───────────────────────────────────────────────
 _WS_NAMESPACE = "/dashboard"
@@ -111,7 +121,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ── Rate limiter & error handlers ────────────────────────────
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
+app.add_exception_handler(ValidationError, validation_error_handler)
+app.add_exception_handler(Exception, generic_error_handler)
+
 # ── Include API routers ─────────────────────────────────────
+from backend.api.auth import router as auth_router
 from backend.api.connections import router as connections_router
 from backend.api.dashboards import router as dashboards_router
 from backend.api.prompts import router as prompts_router
@@ -119,6 +136,7 @@ from backend.api.queries import router as queries_router
 from backend.api.uploads import router as uploads_router
 from backend.api.widgets import router as widgets_router
 
+app.include_router(auth_router, prefix="/api")
 app.include_router(connections_router, prefix="/api")
 app.include_router(uploads_router, prefix="/api")
 app.include_router(prompts_router, prefix="/api")
