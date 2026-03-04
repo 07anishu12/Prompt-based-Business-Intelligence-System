@@ -20,6 +20,19 @@ _DANGEROUS_FUNCTIONS = re.compile(
 
 _WRITE_STATEMENTS = {"INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "CREATE", "TRUNCATE", "GRANT", "REVOKE"}
 
+# Pattern to match string literals (single-quoted, double-quoted, dollar-quoted)
+_STRING_LITERAL_RE = re.compile(
+    r"'(?:[^'\\]|\\.)*'"       # single-quoted
+    r'|"(?:[^"\\]|\\.)*"'     # double-quoted identifiers
+    r"|\$\$.*?\$\$",          # dollar-quoted (Postgres)
+    re.DOTALL,
+)
+
+
+def _strip_literals(sql: str) -> str:
+    """Replace string/identifier literals with empty strings to avoid false positives."""
+    return _STRING_LITERAL_RE.sub("''", sql)
+
 
 def validate_sql(sql: str) -> bool:
     """Validate that SQL is a safe read-only query.
@@ -44,15 +57,15 @@ def validate_sql(sql: str) -> bool:
     if stmt_type and stmt_type.upper() not in ("SELECT", "UNKNOWN"):
         raise UnsafeQueryError(f"Only SELECT queries are allowed, got: {stmt_type}")
 
-    # Check for write keywords in the raw SQL
-    tokens_upper = stripped.upper()
+    # Strip string literals so keywords inside strings don't trigger false positives
+    safe_sql = _strip_literals(stripped).upper()
+
     for kw in _WRITE_STATEMENTS:
-        # Match as whole word
-        if re.search(rf"\b{kw}\b", tokens_upper):
+        if re.search(rf"\b{kw}\b", safe_sql):
             raise UnsafeQueryError(f"Forbidden keyword detected: {kw}")
 
-    # Check for dangerous functions
-    if _DANGEROUS_FUNCTIONS.search(stripped):
+    # Check for dangerous functions (also on stripped version)
+    if _DANGEROUS_FUNCTIONS.search(_strip_literals(stripped)):
         raise UnsafeQueryError("Dangerous function detected in query")
 
     return True

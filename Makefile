@@ -1,7 +1,7 @@
 .PHONY: dev migrate seed test lint docker-up docker-down
 
 dev:
-	uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
+	uvicorn backend.main:asgi_app --reload --host 0.0.0.0 --port 8000
 
 migrate:
 	alembic upgrade head

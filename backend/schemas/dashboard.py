@@ -1,5 +1,6 @@
+import uuid
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -16,7 +17,7 @@ class DashboardUpdate(BaseModel):
 
 
 class DashboardRead(BaseModel):
-    id: str
+    id: uuid.UUID
     title: str
     description: Optional[str] = None
     layout: dict
@@ -27,6 +28,10 @@ class DashboardRead(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class DashboardExportRequest(BaseModel):
+    format: Literal["pdf", "png"] = "pdf"
 
 
 class DashboardDetail(DashboardRead):

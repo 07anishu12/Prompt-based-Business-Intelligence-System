@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime
 from typing import Any, Optional
 
@@ -35,8 +36,8 @@ class WidgetCreate(BaseModel):
 
 
 class WidgetRead(BaseModel):
-    id: str
-    dashboard_id: str
+    id: uuid.UUID
+    dashboard_id: uuid.UUID
     type: str
     title: Optional[str] = None
     prompt_used: Optional[str] = None

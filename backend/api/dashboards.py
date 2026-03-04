@@ -20,7 +20,9 @@ from backend.models.widget import Widget
 from backend.schemas.dashboard import (
     DashboardCreate,
     DashboardDetail,
+    DashboardExportRequest,
     DashboardRead,
+    DashboardUpdate,
     LayoutUpdate,
 )
 
@@ -66,18 +68,8 @@ def _dashboard_to_read(d: Dashboard) -> dict:
     }
 
 
-def _widget_to_dict(w: Widget) -> dict:
-    return {
-        "id": str(w.id),
-        "dashboard_id": str(w.dashboard_id),
-        "type": w.type,
-        "title": w.title,
-        "prompt_used": w.prompt_used,
-        "chart_config": w.chart_config or {},
-        "layout_position": w.layout_position or {},
-        "data": (w.cached_data or {}).get("rows", []),
-        "created_at": w.created_at.isoformat() if w.created_at else None,
-    }
+# Use shared widget serializer
+from backend.api._helpers import widget_to_dict as _widget_to_dict
 
 
 # ── routes ───────────────────────────────────────────────────
@@ -131,14 +123,17 @@ async def get_dashboard(
 @router.put("/{dashboard_id}")
 async def update_dashboard(
     dashboard_id: str,
-    body: DashboardCreate,
+    body: DashboardUpdate,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
 ):
     d = await _get_dashboard_or_404(dashboard_id, user, db)
-    d.title = body.title
+    if body.title is not None:
+        d.title = body.title
     if body.description is not None:
         d.description = body.description
+    if body.settings is not None:
+        d.settings = body.settings
     await db.flush()
     await db.refresh(d)
     return _dashboard_to_read(d)
@@ -155,15 +150,24 @@ async def update_layout(
     """Batch update widget positions in a single transaction."""
     d = await _get_dashboard_or_404(dashboard_id, user, db)
 
+    # Pre-fetch all affected widgets in a single query
+    widget_ids = []
+    positions_map: dict[uuid.UUID, dict] = {}
     for item in body.widgets:
         try:
             w_uuid = uuid.UUID(item.id)
+            widget_ids.append(w_uuid)
+            positions_map[w_uuid] = {"x": item.x, "y": item.y, "w": item.w, "h": item.h}
         except ValueError:
             continue
-        result = await db.execute(select(Widget).where(Widget.id == w_uuid))
-        widget = result.scalar_one_or_none()
-        if widget and widget.dashboard_id == d.id:
-            widget.layout_position = {"x": item.x, "y": item.y, "w": item.w, "h": item.h}
+
+    if widget_ids:
+        result = await db.execute(
+            select(Widget).where(Widget.id.in_(widget_ids), Widget.dashboard_id == d.id)
+        )
+        widgets = result.scalars().all()
+        for widget in widgets:
+            widget.layout_position = positions_map[widget.id]
 
     await db.flush()
 
@@ -233,15 +237,13 @@ async def duplicate_dashboard(
 @router.post("/{dashboard_id}/export")
 async def export_dashboard(
     dashboard_id: str,
-    body: dict,
+    body: DashboardExportRequest,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
 ):
     """Export dashboard as PDF or PNG using Playwright."""
     d = await _get_dashboard_or_404(dashboard_id, user, db)
-    fmt = body.get("format", "pdf")
-    if fmt not in ("pdf", "png"):
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Format must be 'pdf' or 'png'")
+    fmt = body.format
 
     from backend.services.export_service import export_dashboard as do_export
 
@@ -272,13 +274,5 @@ async def toggle_share(
     return {"is_public": d.is_public, "share_url": share_url}
 
 
-@router.get("/public/{dashboard_id}")
-async def get_public_dashboard(
-    dashboard_id: str,
-    db: AsyncSession = Depends(get_db_session),
-):
-    """No auth required — returns dashboard if is_public=True."""
-    d = await _get_dashboard_or_404(dashboard_id, user=None, db=db, public_ok=True)
-    data = _dashboard_to_read(d)
-    data["widgets"] = [_widget_to_dict(w) for w in d.widgets]
-    return data
+# Public dashboard endpoint is registered in main.py at /api/public/dashboard/{id}
+# to avoid the /api/dashboards prefix conflict

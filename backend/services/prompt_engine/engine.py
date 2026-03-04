@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import time
 import uuid
 
 import anthropic
@@ -42,8 +41,6 @@ class PromptEngine:
         db_session: AsyncSession,
     ) -> PromptResponse:
         """Full pipeline: NL prompt → classified intent → SQL → execution → widget."""
-        start = time.perf_counter()
-
         # 1. Classify intent
         claude = self._get_claude()
         intent = await intent_classifier.classify_with_fallback(
@@ -85,10 +82,7 @@ class PromptEngine:
             )
             db_conn = result.scalar_one_or_none()
             if db_conn:
-                config = decrypt_config(
-                    db_conn.config if isinstance(db_conn.config, str) else db_conn.config,
-                    settings.JWT_SECRET,
-                )
+                config = decrypt_config(db_conn.config, settings.JWT_SECRET)
                 connector = ConnectorFactory.create(db_conn.type, config)
                 try:
                     qr = await connector.execute_query(
@@ -98,8 +92,6 @@ class PromptEngine:
                     execution_ms = qr.execution_ms
                 finally:
                     await connector.disconnect()
-
-        total_ms = int((time.perf_counter() - start) * 1000)
 
         # 6. Recommend chart type (may override Claude's suggestion)
         recommended_chart = chart_recommender.recommend(
@@ -186,3 +178,114 @@ class PromptEngine:
             error=error,
         )
         db_session.add(log)
+        await db_session.flush()
+
+    async def modify_prompt(
+        self,
+        *,
+        original_sql: str,
+        modification_prompt: str,
+        connection_id: str | None,
+        dashboard_id: str | None,
+        user_id: str,
+        db_session: AsyncSession,
+    ) -> PromptResponse:
+        """Modify an existing query — skips intent classification, sends original
+        SQL context directly to the query generator so Claude can refine it."""
+        claude = self._get_claude()
+
+        # Skip intent classifier — this is always a "modify/refine" intent
+        intent = "modify"
+
+        # Build schema context
+        conn_ids = [connection_id] if connection_id else []
+        schema_ctx = await schema_context.build_context(
+            conn_ids, db_session, prompt=modification_prompt
+        )
+
+        # Compose a prompt that gives Claude the original SQL + the modification
+        combined_prompt = (
+            f"Here is an existing SQL query:\n```sql\n{original_sql}\n```\n\n"
+            f"Modify it as follows: {modification_prompt}"
+        )
+
+        generation = await query_generator.generate(
+            combined_prompt, schema_ctx, intent, claude
+        )
+
+        # Validate
+        try:
+            validate_sql(generation.sql)
+        except UnsafeQueryError as e:
+            fake_req = PromptRequest(
+                prompt=modification_prompt,
+                connection_id=connection_id,
+                dashboard_id=dashboard_id,
+            )
+            await self._log_query(
+                db_session, user_id, fake_req, intent,
+                generation.sql, error=str(e)
+            )
+            raise
+
+        # Execute
+        query_result_rows: list[dict] = []
+        execution_ms = 0
+        if connection_id:
+            from backend.models.connection import DataConnection
+            from sqlalchemy import select as sa_select
+
+            conn_uuid = uuid.UUID(connection_id)
+            result = await db_session.execute(
+                sa_select(DataConnection).where(DataConnection.id == conn_uuid)
+            )
+            db_conn = result.scalar_one_or_none()
+            if db_conn:
+                config = decrypt_config(db_conn.config, settings.JWT_SECRET)
+                connector = ConnectorFactory.create(db_conn.type, config)
+                try:
+                    qr = await connector.execute_query(
+                        generation.sql, generation.params or None
+                    )
+                    query_result_rows = qr.rows
+                    execution_ms = qr.execution_ms
+                finally:
+                    await connector.disconnect()
+
+        chart_type = generation.chart_type
+
+        widget_result = widget_builder.build_widget(
+            prompt=modification_prompt,
+            query_result=query_result_rows,
+            chart_type=chart_type,
+            chart_config=generation.chart_config,
+            title=generation.title,
+            explanation=generation.explanation,
+            connection_id=connection_id,
+            dashboard_id=dashboard_id,
+            sql=generation.sql,
+            params=generation.params,
+        )
+
+        # Log
+        fake_req = PromptRequest(
+            prompt=modification_prompt,
+            connection_id=connection_id,
+            dashboard_id=dashboard_id,
+        )
+        await self._log_query(
+            db_session, user_id, fake_req, intent,
+            generation.sql, execution_ms=execution_ms,
+            row_count=len(query_result_rows),
+        )
+
+        return PromptResponse(
+            widget=widget_result,
+            query_info=QueryInfo(
+                sql=generation.sql,
+                params=generation.params or [],
+                execution_ms=execution_ms,
+                row_count=len(query_result_rows),
+            ),
+            explanation=generation.explanation,
+        )

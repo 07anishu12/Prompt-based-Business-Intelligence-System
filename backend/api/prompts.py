@@ -116,10 +116,7 @@ async def explain_prompt(
             )
             db_conn = result.scalar_one_or_none()
             if db_conn:
-                config = decrypt_config(
-                    db_conn.config if isinstance(db_conn.config, str) else db_conn.config,
-                    settings.JWT_SECRET,
-                )
+                config = decrypt_config(db_conn.config, settings.JWT_SECRET)
                 connector = ConnectorFactory.create(db_conn.type, config)
                 try:
                     qr = await connector.execute_query(sql)
@@ -216,15 +213,16 @@ async def modify_widget(
     original_sql = widget.query_config.get("sql", "") if widget.query_config else ""
     connection_id = str(widget.connection_id) if widget.connection_id else None
 
-    # Build a modification request
-    mod_request = PromptRequest(
-        prompt=f"Original query: {original_sql}\nModification: {modification_prompt}",
-        connection_id=connection_id,
-        dashboard_id=str(widget.dashboard_id),
-    )
-
+    # Use dedicated modify path — skips intent classification
     try:
-        response = await _engine.process_prompt(mod_request, str(user.id), db)
+        response = await _engine.modify_prompt(
+            original_sql=original_sql,
+            modification_prompt=modification_prompt,
+            connection_id=connection_id,
+            dashboard_id=str(widget.dashboard_id),
+            user_id=str(user.id),
+            db_session=db,
+        )
     except Exception as e:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e))
 

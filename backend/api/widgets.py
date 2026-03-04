@@ -188,10 +188,7 @@ async def refresh_widget(
     if db_conn is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Connection not found")
 
-    config = decrypt_config(
-        db_conn.config if isinstance(db_conn.config, str) else db_conn.config,
-        settings.JWT_SECRET,
-    )
+    config = decrypt_config(db_conn.config, settings.JWT_SECRET)
     connector = ConnectorFactory.create(db_conn.type, config)
     try:
         params = (widget.query_config or {}).get("params")
@@ -207,15 +204,5 @@ async def refresh_widget(
         await connector.disconnect()
 
 
-def _widget_response(w: Widget) -> dict:
-    return {
-        "id": str(w.id),
-        "dashboard_id": str(w.dashboard_id),
-        "type": w.type,
-        "title": w.title,
-        "prompt_used": w.prompt_used,
-        "chart_config": w.chart_config or {},
-        "layout_position": w.layout_position or {},
-        "data": (w.cached_data or {}).get("rows", []),
-        "created_at": w.created_at.isoformat() if w.created_at else None,
-    }
+# Use shared widget serializer
+from backend.api._helpers import widget_to_dict as _widget_response

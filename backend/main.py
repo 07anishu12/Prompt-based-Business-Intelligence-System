@@ -9,15 +9,18 @@ from loguru import logger
 
 from backend.config import settings
 
+# ── Constants ───────────────────────────────────────────────
+_WS_NAMESPACE = "/dashboard"
+
 # ── Socket.IO server ────────────────────────────────────────
 sio = socketio.AsyncServer(
     async_mode="asgi",
     cors_allowed_origins=["http://localhost:5173", "http://localhost:3000"],
-    namespaces=["/dashboard"],
+    namespaces=[_WS_NAMESPACE],
 )
 
 
-@sio.event(namespace="/dashboard")
+@sio.event(namespace=_WS_NAMESPACE)
 async def connect(sid, environ, auth=None):
     """Verify JWT on WebSocket connect, then join dashboard room."""
     token = None
@@ -41,27 +44,27 @@ async def connect(sid, environ, auth=None):
     except JWTError:
         raise socketio.exceptions.ConnectionRefusedError("Invalid token")
 
-    await sio.save_session(sid, {"user_id": user_id}, namespace="/dashboard")
+    await sio.save_session(sid, {"user_id": user_id}, namespace=_WS_NAMESPACE)
     logger.info(f"WS connected: {sid} (user {user_id})")
 
 
-@sio.event(namespace="/dashboard")
+@sio.event(namespace=_WS_NAMESPACE)
 async def join_dashboard(sid, data):
     """Client joins a dashboard room to receive real-time updates."""
     dashboard_id = data.get("dashboard_id") if isinstance(data, dict) else data
     if dashboard_id:
-        sio.enter_room(sid, dashboard_id, namespace="/dashboard")
+        sio.enter_room(sid, dashboard_id, namespace=_WS_NAMESPACE)
         logger.debug(f"WS {sid} joined room {dashboard_id}")
 
 
-@sio.event(namespace="/dashboard")
+@sio.event(namespace=_WS_NAMESPACE)
 async def leave_dashboard(sid, data):
     dashboard_id = data.get("dashboard_id") if isinstance(data, dict) else data
     if dashboard_id:
-        sio.leave_room(sid, dashboard_id, namespace="/dashboard")
+        sio.leave_room(sid, dashboard_id, namespace=_WS_NAMESPACE)
 
 
-@sio.event(namespace="/dashboard")
+@sio.event(namespace=_WS_NAMESPACE)
 async def disconnect(sid):
     logger.debug(f"WS disconnected: {sid}")
 
@@ -124,6 +127,59 @@ app.include_router(widgets_router, prefix="/api")
 app.include_router(queries_router, prefix="/api")
 
 
+# ── Public (no-auth) endpoint for shared dashboards ─────────
+@app.get("/api/public/dashboard/{dashboard_id}")
+async def get_public_dashboard(
+    dashboard_id: str,
+    db: AsyncSession = Depends(get_db_session),
+):
+    """No auth required — returns dashboard if is_public=True."""
+    import uuid as _uuid
+
+    from sqlalchemy.orm import selectinload
+
+    from backend.models.dashboard import Dashboard
+
+    try:
+        uid = _uuid.UUID(dashboard_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid dashboard ID")
+
+    result = await db.execute(
+        select(Dashboard).options(selectinload(Dashboard.widgets)).where(Dashboard.id == uid)
+    )
+    dashboard = result.scalar_one_or_none()
+    if dashboard is None or not dashboard.is_public:
+        raise HTTPException(status_code=404, detail="Dashboard not found")
+
+    widgets_data = []
+    for w in dashboard.widgets:
+        widgets_data.append({
+            "id": str(w.id),
+            "dashboard_id": str(w.dashboard_id),
+            "type": w.type,
+            "title": w.title,
+            "prompt_used": w.prompt_used,
+            "chart_config": w.chart_config or {},
+            "layout_position": w.layout_position or {},
+            "data": (w.cached_data or {}).get("rows", []),
+            "created_at": w.created_at.isoformat() if w.created_at else None,
+        })
+
+    return {
+        "id": str(dashboard.id),
+        "title": dashboard.title,
+        "description": dashboard.description,
+        "layout": dashboard.layout or {},
+        "settings": dashboard.settings or {},
+        "is_public": dashboard.is_public,
+        "widget_count": len(dashboard.widgets),
+        "created_at": dashboard.created_at,
+        "updated_at": dashboard.updated_at,
+        "widgets": widgets_data,
+    }
+
+
 @app.get("/api/health")
 async def health_check():
     redis_ok = False
@@ -134,7 +190,18 @@ async def health_check():
         except Exception:
             pass
 
-    return {"status": "ok", "redis": redis_ok}
+    db_ok = False
+    try:
+        from backend.db.engine import async_engine
+        from sqlalchemy import text
+
+        async with async_engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+            db_ok = True
+    except Exception:
+        pass
+
+    return {"status": "ok", "db": db_ok, "redis": redis_ok}
 
 
 # ── Combined ASGI app (FastAPI + Socket.IO) ──────────────────
