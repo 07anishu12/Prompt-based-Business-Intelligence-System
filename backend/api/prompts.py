@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.config import settings
 from backend.db.session import get_db_session
 from backend.dependencies import get_current_user
+from backend.middleware.rate_limiter import limiter
 from backend.models.connection import DataConnection
 from backend.models.user import User
 from backend.models.widget import Widget
@@ -36,6 +37,7 @@ _engine = PromptEngine()
 
 
 @router.post("", response_model=PromptResponse)
+@limiter.limit("30/minute")
 async def process_prompt(
     body: PromptRequest,
     request: Request,

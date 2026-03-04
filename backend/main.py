@@ -2,14 +2,18 @@ from contextlib import asynccontextmanager
 
 import redis.asyncio as aioredis
 import socketio
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from jose import JWTError, jwt
 from loguru import logger
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from pydantic import ValidationError
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+
+from backend.db.session import get_db_session
 
 from backend.config import settings
 from backend.middleware.error_handler import (
@@ -128,21 +132,9 @@ app.add_exception_handler(ValidationError, validation_error_handler)
 app.add_exception_handler(Exception, generic_error_handler)
 
 # ── Include API routers ─────────────────────────────────────
-from backend.api.auth import router as auth_router
-from backend.api.connections import router as connections_router
-from backend.api.dashboards import router as dashboards_router
-from backend.api.prompts import router as prompts_router
-from backend.api.queries import router as queries_router
-from backend.api.uploads import router as uploads_router
-from backend.api.widgets import router as widgets_router
+from backend.api.router import api_router
 
-app.include_router(auth_router, prefix="/api")
-app.include_router(connections_router, prefix="/api")
-app.include_router(uploads_router, prefix="/api")
-app.include_router(prompts_router, prefix="/api")
-app.include_router(dashboards_router, prefix="/api")
-app.include_router(widgets_router, prefix="/api")
-app.include_router(queries_router, prefix="/api")
+app.include_router(api_router)
 
 
 # ── Public (no-auth) endpoint for shared dashboards ─────────

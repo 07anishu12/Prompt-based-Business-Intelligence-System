@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.config import settings
 from backend.db.session import get_db_session
 from backend.dependencies import get_current_user
+from backend.middleware.rate_limiter import limiter
 from backend.models.connection import DataConnection
 from backend.models.query_log import QueryLog
 from backend.models.user import User
@@ -26,7 +27,9 @@ MAX_ROWS = 10_000
 
 
 @router.post("/execute", response_model=QueryResult)
+@limiter.limit("60/minute")
 async def execute_query(
+    request: Request,
     body: QueryRequest,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),

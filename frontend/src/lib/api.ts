@@ -97,8 +97,8 @@ export const promptApi = {
     api.post<PromptResponse>("/prompt", data).then((r) => r.data),
   suggest: (connectionId?: string) =>
     api
-      .get<{ suggestions: string[] }>("/prompt/suggest", {
-        params: connectionId ? { connection_id: connectionId } : {},
+      .post<{ suggestions: string[] }>("/prompt/suggest", {
+        connection_id: connectionId,
       })
       .then((r) => r.data.suggestions),
 };
