@@ -21,9 +21,38 @@
   .dark .dot-grid-bg {
     background-image: radial-gradient(circle, #374151 1px, transparent 1px);
   }
+
+  /* Skeleton shimmer placeholder */
+  .skeleton {
+    @apply relative overflow-hidden bg-gray-200 dark:bg-gray-800;
+    background: linear-gradient(
+      90deg,
+      theme("colors.gray.200") 25%,
+      theme("colors.gray.100") 50%,
+      theme("colors.gray.200") 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  .dark .skeleton {
+    background: linear-gradient(
+      90deg,
+      theme("colors.gray.800") 25%,
+      theme("colors.gray.700") 50%,
+      theme("colors.gray.800") 75%
+    );
+    background-size: 200% 100%;
+  }
+
+  /* Glass morphism effect for prompt bar */
+  .glass {
+    @apply bg-white/80 backdrop-blur-xl dark:bg-gray-900/80;
+  }
 }
 
-/* react-grid-layout styles */
+/* ── react-grid-layout styles ──────────────────────────────── */
+
 .react-grid-layout {
   position: relative;
   transition: height 200ms ease;
@@ -76,4 +105,10 @@
   height: 6px;
   border-right: 2px solid rgba(0, 0, 0, 0.2);
   border-bottom: 2px solid rgba(0, 0, 0, 0.2);
+}
+
+/* ── Page transition ────────────────────────────────────────── */
+
+main > * {
+  animation: fadeIn 200ms ease-out;
 }

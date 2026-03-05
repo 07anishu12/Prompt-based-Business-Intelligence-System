@@ -7,6 +7,8 @@ export interface ChartConfig {
   stacked: boolean;
   show_values: boolean;
   orientation: string;
+  /** Allow extra properties used by KPI, text, and filter widgets */
+  [key: string]: unknown;
 }
 
 export interface LayoutPosition {
@@ -27,6 +29,7 @@ export interface Widget {
   chart_config: ChartConfig;
   layout_position: LayoutPosition;
   data?: Record<string, unknown>[];
+  cached_data?: Record<string, unknown>[];
   created_at: string;
 }
 

@@ -1,140 +1,106 @@
-import {
-  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
-} from "recharts";
 import type { Widget } from "@/types/widget";
-
-const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316"];
+import { ChartWidget, type ChartType } from "./ChartWidget";
+import { TableWidget } from "./TableWidget";
+import { KPIWidget } from "./KPIWidget";
+import { TextWidget } from "./TextWidget";
+import { FilterWidget, type FilterType } from "./FilterWidget";
 
 interface Props {
   widget: Widget;
+  onFilterChange?: (value: string | { start: string; end: string }) => void;
+  onTextChange?: (content: string) => void;
+  onChartClick?: (payload: Record<string, unknown>) => void;
 }
 
-export function WidgetRenderer({ widget }: Props) {
-  const data = widget.data || [];
+const CHART_TYPES = new Set<string>([
+  "bar",
+  "line",
+  "pie",
+  "area",
+  "scatter",
+  "heatmap",
+]);
+
+export function WidgetRenderer({
+  widget,
+  onFilterChange,
+  onTextChange,
+  onChartClick,
+}: Props) {
+  const data = widget.data || widget.cached_data || [];
   const config = widget.chart_config;
 
-  if (data.length === 0) {
+  if (CHART_TYPES.has(widget.type)) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-gray-400">
-        No data
-      </div>
+      <ChartWidget
+        type={widget.type as ChartType}
+        data={data as Record<string, unknown>[]}
+        chartConfig={config}
+        onChartClick={onChartClick}
+      />
     );
   }
 
   switch (widget.type) {
-    case "bar":
+    case "table":
       return (
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 10, right: 10, bottom: 0, left: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-            <XAxis dataKey={config.x_field} tick={{ fontSize: 11 }} />
-            <YAxis tick={{ fontSize: 11 }} />
-            <Tooltip />
-            {config.y_fields.map((field, i) => (
-              <Bar
-                key={field}
-                dataKey={field}
-                fill={config.colors[i] || COLORS[i % COLORS.length]}
-                radius={[4, 4, 0, 0]}
-                stackId={config.stacked ? "stack" : undefined}
-              />
-            ))}
-            {config.y_fields.length > 1 && <Legend />}
-          </BarChart>
-        </ResponsiveContainer>
-      );
-
-    case "line":
-      return (
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 10, right: 10, bottom: 0, left: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-            <XAxis dataKey={config.x_field} tick={{ fontSize: 11 }} />
-            <YAxis tick={{ fontSize: 11 }} />
-            <Tooltip />
-            {config.y_fields.map((field, i) => (
-              <Line
-                key={field}
-                type="monotone"
-                dataKey={field}
-                stroke={config.colors[i] || COLORS[i % COLORS.length]}
-                strokeWidth={2}
-                dot={false}
-              />
-            ))}
-            {config.y_fields.length > 1 && <Legend />}
-          </LineChart>
-        </ResponsiveContainer>
-      );
-
-    case "pie":
-      return (
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie
-              data={data}
-              dataKey={config.y_fields[0]}
-              nameKey={config.x_field}
-              cx="50%"
-              cy="50%"
-              outerRadius="80%"
-              label={({ name }) => name}
-              labelLine={false}
-            >
-              {data.map((_, i) => (
-                <Cell key={i} fill={COLORS[i % COLORS.length]} />
-              ))}
-            </Pie>
-            <Tooltip />
-          </PieChart>
-        </ResponsiveContainer>
+        <TableWidget
+          data={data as Record<string, unknown>[]}
+          columns={config?.y_fields}
+        />
       );
 
     case "kpi": {
-      const value = data[0]?.[config.y_fields[0]];
-      const label = config.x_field ? String(data[0]?.[config.x_field] ?? "") : config.y_fields[0];
+      const firstRow = (data as Record<string, unknown>[])[0];
+      const valueField = config?.y_fields?.[0];
+      const value = firstRow ? Number(firstRow[valueField] ?? 0) : 0;
+      const label =
+        config?.x_field && firstRow
+          ? String(firstRow[config.x_field] ?? valueField)
+          : valueField ?? widget.title ?? "Metric";
+
       return (
-        <div className="flex h-full flex-col items-center justify-center">
-          <span className="text-3xl font-bold text-gray-900 dark:text-white">
-            {typeof value === "number" ? value.toLocaleString() : String(value ?? "—")}
-          </span>
-          <span className="mt-1 text-sm text-gray-500">{label}</span>
-        </div>
+        <KPIWidget
+          value={value}
+          title={label}
+          subtitle={widget.prompt_used ?? undefined}
+          prefix={config?.prefix as string | undefined}
+          suffix={config?.suffix as string | undefined}
+        />
       );
     }
 
-    case "table":
+    case "text":
       return (
-        <div className="h-full overflow-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="sticky top-0 bg-gray-50 dark:bg-gray-800">
-              <tr>
-                {Object.keys(data[0] || {}).map((col) => (
-                  <th key={col} className="px-3 py-2 font-medium text-gray-600 dark:text-gray-400">
-                    {col}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {data.slice(0, 100).map((row, i) => (
-                <tr key={i} className="border-t border-gray-100 dark:border-gray-800">
-                  {Object.values(row).map((val, j) => (
-                    <td key={j} className="px-3 py-1.5 text-gray-700 dark:text-gray-300">
-                      {String(val ?? "")}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <TextWidget
+          content={(config?.content as string) ?? widget.prompt_used ?? ""}
+          onChange={onTextChange}
+          readOnly={!onTextChange}
+        />
       );
+
+    case "filter": {
+      const filterType: FilterType =
+        (config?.filter_type as FilterType) ?? "select";
+      const options = (config?.options as string[]) ?? [];
+      const filterValue =
+        (config?.current_value as string | { start: string; end: string }) ??
+        "";
+      return (
+        <FilterWidget
+          type={filterType}
+          options={options}
+          value={filterValue}
+          onChange={onFilterChange ?? (() => {})}
+          label={widget.title ?? config?.x_field ?? undefined}
+          placeholder={config?.placeholder as string | undefined}
+        />
+      );
+    }
 
     default:
       return (
-        <div className="flex h-full items-center justify-center text-sm text-gray-400">
+        <div className="flex h-full items-center justify-center text-sm text-gray-400 dark:text-gray-500">
           Unsupported widget type: {widget.type}
         </div>
       );
