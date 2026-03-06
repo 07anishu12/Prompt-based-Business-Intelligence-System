@@ -215,4 +215,4 @@ async def health_check():
 
 
 # ── Combined ASGI app (FastAPI + Socket.IO) ──────────────────
-asgi_app = socketio.ASGIApp(sio, other_app=app)
+asgi_app = socketio.ASGIApp(sio, other_asgi_app=app)

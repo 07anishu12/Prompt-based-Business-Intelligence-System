@@ -18,7 +18,7 @@ class QueryLog(Base):
         UUID(as_uuid=True), ForeignKey("users.id"), index=True, nullable=False
     )
     connection_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("connections.id"), nullable=True
+        UUID(as_uuid=True), ForeignKey("connections.id", ondelete="SET NULL"), nullable=True
     )
     prompt: Mapped[str] = mapped_column(Text, nullable=False)
     generated_query: Mapped[str | None] = mapped_column(Text, nullable=True)

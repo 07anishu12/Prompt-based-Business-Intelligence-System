@@ -55,6 +55,13 @@ async def _get_dashboard_or_404(
 
 
 def _dashboard_to_read(d: Dashboard) -> dict:
+    from sqlalchemy.orm import attributes
+    # Avoid lazy-loading widgets in async context — check if already loaded
+    try:
+        widgets = attributes.instance_state(d).dict.get("widgets")
+        widget_count = len(widgets) if widgets is not None else 0
+    except Exception:
+        widget_count = 0
     return {
         "id": str(d.id),
         "title": d.title,
@@ -62,7 +69,7 @@ def _dashboard_to_read(d: Dashboard) -> dict:
         "layout": d.layout or {},
         "settings": d.settings or {},
         "is_public": d.is_public,
-        "widget_count": len(d.widgets) if d.widgets else 0,
+        "widget_count": widget_count,
         "created_at": d.created_at,
         "updated_at": d.updated_at,
     }

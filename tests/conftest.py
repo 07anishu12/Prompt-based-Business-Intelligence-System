@@ -80,7 +80,7 @@ async def test_user(db_session: AsyncSession) -> User:
             id=_FAKE_USER_ID,
             email="test@example.com",
             name="Test User",
-            hashed_password="not-a-real-hash",
+            password_hash="not-a-real-hash",
         )
         db_session.add(user)
         await db_session.flush()
