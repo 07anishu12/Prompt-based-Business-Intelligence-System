@@ -45,6 +45,7 @@ export interface WidgetCreate {
 
 export interface WidgetUpdate {
   title?: string;
+  type?: string;
   chart_config?: Record<string, unknown>;
   layout_position?: Record<string, unknown>;
 }

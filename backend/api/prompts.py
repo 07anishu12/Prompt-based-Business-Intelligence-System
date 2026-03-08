@@ -72,17 +72,17 @@ async def explain_prompt(
     db: AsyncSession = Depends(get_db_session),
 ):
     """Answer a data question without creating a widget."""
-    import anthropic
+    from backend.services.llm_client import get_llm_client
 
-    client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+    client = get_llm_client()
 
     # Build schema context
     conn_ids = [body.connection_id] if body.connection_id else []
     schema_ctx = await build_context(conn_ids, db, prompt=body.prompt)
 
-    # Call Claude with an analyst persona
+    # Call LLM with an analyst persona
     response = await client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model=settings.LLM_MODEL,
         max_tokens=2048,
         system=(
             "You are a data analyst. Answer the user's question about their data.\n"
@@ -154,11 +154,11 @@ async def suggest_prompts(
     # Build schema context
     schema_ctx = await build_context([connection_id], db)
 
-    import anthropic
+    from backend.services.llm_client import get_llm_client
 
-    client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+    client = get_llm_client()
     response = await client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model=settings.LLM_MODEL,
         max_tokens=512,
         system=(
             "Given this database schema, suggest 10 interesting BI questions "

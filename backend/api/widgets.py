@@ -99,6 +99,8 @@ async def update_widget(
     widget = await _get_widget_or_404(widget_id, user, db)
     if body.title is not None:
         widget.title = body.title
+    if body.type is not None:
+        widget.type = body.type
     if body.chart_config is not None:
         widget.chart_config = body.chart_config
     if body.layout_position is not None:

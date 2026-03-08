@@ -34,6 +34,7 @@ services:
       --host 0.0.0.0 --port 8000 --reload
     volumes:
       - ./backend:/app/backend
+      - ./uploads:/app/uploads
     ports:
       - "8080:8000"
       - "5678:5678"   # debugpy remote debug port
@@ -60,6 +61,7 @@ services:
       - "5173:5173"
     environment:
       - VITE_API_URL=http://localhost:8080
+      - VITE_API_TARGET=http://backend:8000
     depends_on:
       - backend
 

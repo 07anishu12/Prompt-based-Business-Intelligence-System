@@ -25,20 +25,20 @@ async def seed():
         if existing:
             print("Demo user already exists!")
             print("Email: demo@example.com")
-            print("Password: demo123")
+            print("Password: demo1234")
             return
 
         # Create demo user
         demo_user = User(
             email="demo@example.com",
             name="Demo User",
-            password_hash=hash_password("demo123")
+            password_hash=hash_password("demo1234")
         )
         session.add(demo_user)
         await session.commit()
         print("Demo user created successfully!")
         print("Email: demo@example.com")
-        print("Password: demo123")
+        print("Password: demo1234")
 
     await engine.dispose()
 

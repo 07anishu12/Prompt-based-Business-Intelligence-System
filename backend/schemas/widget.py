@@ -51,5 +51,6 @@ class WidgetRead(BaseModel):
 
 class WidgetUpdate(BaseModel):
     title: Optional[str] = None
+    type: Optional[str] = None
     chart_config: Optional[dict] = None
     layout_position: Optional[dict] = None

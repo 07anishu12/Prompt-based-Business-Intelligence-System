@@ -9,7 +9,11 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379"
 
     # Claude AI — no default, must be set in .env
-    ANTHROPIC_API_KEY: str
+    ANTHROPIC_API_KEY: str = ""
+
+    # OpenRouter (preferred over direct Anthropic when set)
+    OPENROUTER_API_KEY: str = ""
+    LLM_MODEL: str = "anthropic/claude-sonnet-4-20250514"
 
     # JWT — no default, must be set in .env
     JWT_SECRET: str

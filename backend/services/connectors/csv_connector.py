@@ -15,12 +15,20 @@ class CSVConnector(DuckDBMixin):
     def __init__(self, config: dict) -> None:
         self._config = config
         self._file_path: str = config["file_path"]
-        self._table_name: str = (
+        raw_name = (
             os.path.splitext(os.path.basename(self._file_path))[0]
             .replace(" ", "_")
             .replace("-", "_")
             .lower()
         )
+        # Strip UUID prefix (e.g. "ab12cd34_demo_sales" → "demo_sales")
+        parts = raw_name.split("_", 1)
+        if len(parts) == 2 and len(parts[0]) == 32 and all(c in "0123456789abcdef" for c in parts[0]):
+            raw_name = parts[1]
+        # Ensure name starts with a letter (valid SQL identifier)
+        if raw_name and not raw_name[0].isalpha():
+            raw_name = "t_" + raw_name
+        self._table_name: str = raw_name
         self._duckdb = None
         self._table_names: list[str] = []
         self._loaded = False

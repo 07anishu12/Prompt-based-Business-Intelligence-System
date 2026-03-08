@@ -1,4 +1,3 @@
-import React from "react";
 import { BarChartComponent } from "@/components/charts/BarChart";
 import { LineChartComponent } from "@/components/charts/LineChart";
 import { PieChartComponent } from "@/components/charts/PieChart";
@@ -11,6 +10,7 @@ export type ChartType =
   | "bar"
   | "line"
   | "pie"
+  | "donut"
   | "area"
   | "scatter"
   | "heatmap";
@@ -31,19 +31,29 @@ export function ChartWidget({
   if (!data || data.length === 0) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-gray-400 dark:text-gray-500">
-        No data available
+        No matching data found for this query
       </div>
     );
   }
 
+  // Ensure chartConfig has valid fields by falling back to data columns
+  const allKeys = Object.keys(data[0]);
+  const numericKeys = allKeys.filter((k) => typeof data[0][k] === "number");
+  const stringKeys = allKeys.filter((k) => typeof data[0][k] === "string");
+
   const config = {
-    x_field: chartConfig.x_field,
-    y_fields: chartConfig.y_fields,
-    colors: chartConfig.colors,
-    stacked: chartConfig.stacked,
-    orientation: chartConfig.orientation as "vertical" | "horizontal",
-    show_values: chartConfig.show_values,
-    group_field: chartConfig.group_field,
+    x_field: chartConfig?.x_field || stringKeys[0] || allKeys[0] || "",
+    y_fields:
+      chartConfig?.y_fields?.length > 0
+        ? chartConfig.y_fields
+        : numericKeys.length > 0
+          ? numericKeys.slice(0, 3)
+          : [allKeys[1] || allKeys[0] || ""],
+    colors: chartConfig?.colors,
+    stacked: chartConfig?.stacked,
+    orientation: (chartConfig?.orientation as "vertical" | "horizontal") || "vertical",
+    show_values: chartConfig?.show_values ?? true,
+    group_field: chartConfig?.group_field,
   };
 
   return (
@@ -66,6 +76,7 @@ export function ChartWidget({
       {type === "bar" && <BarChartComponent data={data} config={config} />}
       {type === "line" && <LineChartComponent data={data} config={config} />}
       {type === "pie" && <PieChartComponent data={data} config={config} />}
+      {type === "donut" && <PieChartComponent data={data} config={{ ...config, donut: true }} />}
       {type === "area" && <AreaChartComponent data={data} config={config} />}
       {type === "scatter" && (
         <ScatterPlotComponent data={data} config={config} />
