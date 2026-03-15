@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import datetime, timezone
+from typing import Any
 
 
 def utcnow() -> datetime:
@@ -36,3 +38,8 @@ def format_number(value: float | int) -> str:
     if isinstance(value, float):
         return f"{value:,.2f}"
     return f"{value:,}"
+
+
+def to_json_compatible(value: Any) -> Any:
+    """Convert nested values into JSON-safe primitives for JSONB storage."""
+    return json.loads(json.dumps(value, default=str))

@@ -12,6 +12,7 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+import backend.models  # noqa: F401  # Ensure SQLAlchemy metadata is populated for tests.
 from backend.db.base import Base
 from backend.db.session import get_db_session
 from backend.dependencies import get_current_user

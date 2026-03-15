@@ -19,6 +19,7 @@ from backend.models.widget import Widget
 from backend.schemas.widget import WidgetCreate, WidgetUpdate
 from backend.services.connectors.factory import ConnectorFactory
 from backend.utils.encryption import decrypt_config
+from backend.utils.helpers import to_json_compatible
 
 router = APIRouter(prefix="/widgets", tags=["widgets"])
 
@@ -313,7 +314,7 @@ async def refresh_widget(
     try:
         params = (widget.query_config or {}).get("params")
         qr = await connector.execute_query(sql, params or None)
-        widget.cached_data = {"rows": qr.rows}
+        widget.cached_data = {"rows": to_json_compatible(qr.rows)}
         await db.flush()
         await db.refresh(widget)
         return _widget_response(widget)

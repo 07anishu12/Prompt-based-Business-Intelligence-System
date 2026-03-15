@@ -4,11 +4,9 @@ import { clsx } from "clsx";
 import { usePromptStore } from "@/stores/promptStore";
 import { useDashboardStore } from "@/stores/dashboardStore";
 import { useConnectionStore } from "@/stores/connectionStore";
-import { widgetApi } from "@/lib/api";
 import { toast } from "@/components/shared/Toast";
 import { PromptSuggestions } from "./PromptSuggestions";
 import { PromptHistory } from "./PromptHistory";
-import type { PromptResponse } from "@/types/query";
 
 const chartIcons: Record<string, typeof BarChart3> = {
   bar: BarChart3,
@@ -28,7 +26,7 @@ export function PromptBar({ dashboardId }: PromptBarProps) {
   const [selectedConnection, setSelectedConnection] = useState<string>("");
   const inputRef = useRef<HTMLInputElement>(null);
   const { isProcessing, lastResult, sendPrompt, clearLastResult } = usePromptStore();
-  const { addWidget } = useDashboardStore();
+  const { fetchDashboard } = useDashboardStore();
   const { connections } = useConnectionStore();
 
   // Cmd+K / Ctrl+K global shortcut
@@ -49,6 +47,9 @@ export function PromptBar({ dashboardId }: PromptBarProps) {
     setInput(text);
     try {
       await sendPrompt(text, selectedConnection || undefined, dashboardId);
+      if (dashboardId) {
+        await fetchDashboard(dashboardId);
+      }
     } catch {
       toast("error", "Failed to process prompt");
     }
@@ -58,30 +59,6 @@ export function PromptBar({ dashboardId }: PromptBarProps) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
-    }
-  };
-
-  const handleAddToDashboard = async (result: PromptResponse) => {
-    if (!dashboardId) {
-      toast("info", "Open a dashboard first to add widgets");
-      return;
-    }
-    try {
-      const widget = await widgetApi.create({
-        dashboard_id: dashboardId,
-        type: result.widget.type,
-        title: result.widget.title,
-        connection_id: selectedConnection || undefined,
-        query_config: result.widget.query_config,
-        chart_config: result.widget.chart_config,
-        layout_position: result.widget.layout_position,
-      });
-      addWidget(widget);
-      clearLastResult();
-      setInput("");
-      toast("success", "Widget added to dashboard");
-    } catch {
-      toast("error", "Failed to add widget");
     }
   };
 
@@ -103,7 +80,7 @@ export function PromptBar({ dashboardId }: PromptBarProps) {
             onChange={(e) => setSelectedConnection(e.target.value)}
             className="max-w-[140px] rounded-md border-0 bg-gray-100 px-2 py-1 text-xs text-gray-600 focus:outline-none dark:bg-gray-800 dark:text-gray-400"
           >
-            <option value="">All sources</option>
+            <option value="">{dashboardId ? "Use dashboard source" : "Select source"}</option>
             {connections.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -179,12 +156,11 @@ export function PromptBar({ dashboardId }: PromptBarProps) {
             </div>
           </div>
           <div className="mt-3 flex gap-2">
-            <button
-              onClick={() => handleAddToDashboard(lastResult)}
-              className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
-            >
-              Add to Dashboard
-            </button>
+            {dashboardId && (
+              <div className="rounded-lg bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">
+                Card added to dashboard
+              </div>
+            )}
             <button
               onClick={clearLastResult}
               className="rounded-lg px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"

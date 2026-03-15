@@ -14,6 +14,20 @@ class ChartConfig(BaseModel):
     stacked: bool = False
     show_values: bool = True
     orientation: str = "vertical"
+    x_axis_label: Optional[str] = None
+    y_axis_label: Optional[str] = None
+    metric_name: Optional[str] = None
+    card_description: Optional[str] = None
+    prefix: Optional[str] = None
+    suffix: Optional[str] = None
+    show_legend: bool = True
+    show_tooltip: bool = True
+    show_grid: bool = True
+    histogram_bins: Optional[int] = None
+    style_config: dict[str, Any] = Field(default_factory=dict)
+    metric_config: dict[str, Any] = Field(default_factory=dict)
+
+    model_config = {"extra": "allow"}
 
 
 class LayoutPosition(BaseModel):

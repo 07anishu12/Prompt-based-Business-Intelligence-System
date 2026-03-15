@@ -13,6 +13,7 @@ from backend.models.widget import Widget
 from backend.schemas.query import QueryResult
 from backend.services.connectors.factory import ConnectorFactory
 from backend.utils.encryption import decrypt_config
+from backend.utils.helpers import to_json_compatible
 
 
 async def refresh_widget_data(
@@ -39,7 +40,7 @@ async def refresh_widget_data(
     try:
         params = (widget.query_config or {}).get("params")
         qr = await connector.execute_query(sql, params or None)
-        widget.cached_data = {"rows": qr.rows}
+        widget.cached_data = {"rows": to_json_compatible(qr.rows)}
         await db.flush()
         await db.refresh(widget)
         return widget

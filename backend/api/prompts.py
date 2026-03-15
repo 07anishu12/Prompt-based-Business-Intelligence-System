@@ -29,6 +29,7 @@ from backend.services.connectors.factory import ConnectorFactory
 from backend.services.prompt_engine.engine import PromptEngine
 from backend.services.prompt_engine.schema_context import build_context
 from backend.utils.encryption import decrypt_config
+from backend.utils.helpers import to_json_compatible
 from backend.utils.sql_validator import validate_sql
 
 router = APIRouter(prefix="/prompt", tags=["prompt"])
@@ -234,7 +235,7 @@ async def modify_widget(
     widget.query_config = {"sql": response.query_info.sql, "params": response.query_info.params}
     widget.chart_config = response.widget.chart_config.model_dump()
     widget.title = response.widget.title
-    widget.cached_data = {"rows": response.widget.data}
+    widget.cached_data = {"rows": to_json_compatible(response.widget.data)}
     await db.flush()
     await db.refresh(widget)
     response.widget.id = str(widget.id)

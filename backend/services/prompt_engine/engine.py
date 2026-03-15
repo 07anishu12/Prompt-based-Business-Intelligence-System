@@ -27,6 +27,7 @@ from backend.services.prompt_engine import (
     widget_builder,
 )
 from backend.utils.encryption import decrypt_config
+from backend.utils.helpers import to_json_compatible
 from backend.utils.sql_validator import (
     SQLSemanticError,
     UnsafeQueryError,
@@ -53,13 +54,25 @@ class PromptEngine:
         intent = await intent_classifier.classify_with_fallback(request.prompt, claude)
         logger.info(f"Intent: {intent}")
 
+        connection = await self._resolve_connection(
+            connection_id=request.connection_id,
+            dashboard_id=request.dashboard_id,
+            user_id=user_id,
+            db_session=db_session,
+        )
+        effective_connection_id = str(connection.id)
+        effective_request = PromptRequest(
+            prompt=request.prompt,
+            connection_id=effective_connection_id,
+            dashboard_id=request.dashboard_id,
+        )
+
         schema_ctx = await schema_context.build_context(
-            [request.connection_id] if request.connection_id else [],
+            [effective_connection_id],
             db_session,
             prompt=request.prompt,
         )
         optimized_prompt = prompt_optimizer.optimize_prompt(request.prompt, schema_ctx, intent)
-        connection = await self._get_connection(request.connection_id, db_session)
 
         generation, validated_sql, query_result_rows, execution_ms, query_error = (
             await self._generate_execute_with_repair(
@@ -111,7 +124,7 @@ class PromptEngine:
             chart_config=generation.chart_config,
             title=generation.title,
             explanation=generation.explanation,
-            connection_id=request.connection_id,
+            connection_id=effective_connection_id,
             dashboard_id=request.dashboard_id,
             existing_positions=existing_positions,
             sql=validated_sql.validated_sql if validated_sql else generation.sql,
@@ -121,7 +134,7 @@ class PromptEngine:
         await self._log_query(
             db_session=db_session,
             user_id=user_id,
-            request=request,
+            request=effective_request,
             intent=intent,
             generated_sql=generation.sql,
             validated_sql=validated_sql.validated_sql if validated_sql else None,
@@ -135,7 +148,7 @@ class PromptEngine:
         if request.dashboard_id:
             db_widget = Widget(
                 dashboard_id=uuid.UUID(request.dashboard_id),
-                connection_id=uuid.UUID(request.connection_id) if request.connection_id else None,
+                connection_id=connection.id,
                 type=chart_type,
                 title=generation.title,
                 prompt_used=request.prompt,
@@ -145,7 +158,7 @@ class PromptEngine:
                 },
                 chart_config=widget_result.chart_config.model_dump(),
                 layout_position=widget_result.layout_position.model_dump(),
-                cached_data={"rows": query_result_rows},
+                cached_data={"rows": to_json_compatible(query_result_rows)},
             )
             db_session.add(db_widget)
             await db_session.flush()
@@ -176,12 +189,18 @@ class PromptEngine:
         """Modify an existing query and re-execute it."""
         claude = self._get_claude()
         intent = "modify"
+        connection = await self._resolve_connection(
+            connection_id=connection_id,
+            dashboard_id=dashboard_id,
+            user_id=user_id,
+            db_session=db_session,
+        )
+        effective_connection_id = str(connection.id)
         schema_ctx = await schema_context.build_context(
-            [connection_id] if connection_id else [],
+            [effective_connection_id],
             db_session,
             prompt=modification_prompt,
         )
-        connection = await self._get_connection(connection_id, db_session)
 
         combined_prompt = (
             f"Here is an existing SQL query:\n```sql\n{original_sql}\n```\n\n"
@@ -220,7 +239,7 @@ class PromptEngine:
             chart_config=generation.chart_config,
             title=generation.title,
             explanation=generation.explanation,
-            connection_id=connection_id,
+            connection_id=effective_connection_id,
             dashboard_id=dashboard_id,
             sql=validated_sql.validated_sql if validated_sql else generation.sql,
             params=generation.params,
@@ -228,7 +247,7 @@ class PromptEngine:
 
         fake_request = PromptRequest(
             prompt=modification_prompt,
-            connection_id=connection_id,
+            connection_id=effective_connection_id,
             dashboard_id=dashboard_id,
         )
         await self._log_query(
@@ -259,16 +278,81 @@ class PromptEngine:
     async def _get_connection(
         self,
         connection_id: str | None,
+        user_id: str | None,
         db_session: AsyncSession,
     ) -> DataConnection | None:
         if not connection_id:
             return None
 
+        user_uuid = uuid.UUID(user_id) if user_id else None
         conn_uuid = uuid.UUID(connection_id)
-        result = await db_session.execute(
-            select(DataConnection).where(DataConnection.id == conn_uuid)
-        )
+        stmt = select(DataConnection).where(DataConnection.id == conn_uuid)
+        if user_uuid is not None:
+            stmt = stmt.where(DataConnection.user_id == user_uuid)
+        result = await db_session.execute(stmt)
         return result.scalar_one_or_none()
+
+    async def _resolve_connection(
+        self,
+        *,
+        connection_id: str | None,
+        dashboard_id: str | None,
+        user_id: str,
+        db_session: AsyncSession,
+    ) -> DataConnection:
+        if connection_id:
+            connection = await self._get_connection(connection_id, user_id, db_session)
+            if connection is None:
+                raise QueryError("Connection not found")
+            return connection
+
+        dashboard_connection = await self._get_dashboard_connection(
+            dashboard_id=dashboard_id,
+            user_id=user_id,
+            db_session=db_session,
+        )
+        if dashboard_connection is not None:
+            return dashboard_connection
+
+        raise QueryError("Select a data source before prompting.")
+
+    async def _get_dashboard_connection(
+        self,
+        *,
+        dashboard_id: str | None,
+        user_id: str,
+        db_session: AsyncSession,
+    ) -> DataConnection | None:
+        if not dashboard_id:
+            return None
+
+        from sqlalchemy import distinct
+
+        from backend.models.dashboard import Dashboard
+
+        dashboard_uuid = uuid.UUID(dashboard_id)
+        user_uuid = uuid.UUID(user_id)
+
+        dashboard_result = await db_session.execute(
+            select(Dashboard).where(Dashboard.id == dashboard_uuid, Dashboard.user_id == user_uuid)
+        )
+        dashboard = dashboard_result.scalar_one_or_none()
+        if dashboard is None:
+            raise QueryError("Dashboard not found")
+
+        connection_result = await db_session.execute(
+            select(distinct(Widget.connection_id))
+            .where(Widget.dashboard_id == dashboard_uuid, Widget.connection_id.is_not(None))
+        )
+        connection_ids = [connection_id for connection_id in connection_result.scalars().all() if connection_id]
+
+        if not connection_ids:
+            return None
+
+        if len(connection_ids) > 1:
+            raise QueryError("This dashboard uses multiple data sources. Select one before prompting.")
+
+        return await self._get_connection(str(connection_ids[0]), user_id, db_session)
 
     async def _generate_execute_with_repair(
         self,
@@ -472,7 +556,7 @@ def _prompt_mentions_timeframe(prompt: str) -> bool:
 
 def _serialize_preview(rows: list[dict]) -> str:
     preview = rows[:5]
-    return json.dumps(preview, default=str) if preview else "[]"
+    return json.dumps(to_json_compatible(preview)) if preview else "[]"
 
 
 def _validate_and_fix_chart_config(
@@ -483,15 +567,31 @@ def _validate_and_fix_chart_config(
     if not rows:
         return chart_config
 
+    chart_config = dict(chart_config or {})
     actual_cols = set(rows[0].keys())
-    x_field = chart_config.get("x_field", "")
-    y_fields = chart_config.get("y_fields", [])
+    x_field = chart_config.get("x_field") or ""
+    raw_y_fields = chart_config.get("y_fields")
+    if isinstance(raw_y_fields, list):
+        y_fields = [field for field in raw_y_fields if field]
+    elif raw_y_fields:
+        y_fields = [raw_y_fields]
+    else:
+        y_fields = []
     sample_row = rows[0]
     string_cols = [col for col in actual_cols if isinstance(sample_row.get(col), str)]
     numeric_cols = [
         col for col in actual_cols if isinstance(sample_row.get(col), (int, float))
     ]
     lower_map = {col.lower(): col for col in actual_cols}
+
+    if not x_field:
+        if string_cols:
+            chart_config["x_field"] = string_cols[0]
+        elif numeric_cols:
+            chart_config["x_field"] = numeric_cols[0]
+        elif actual_cols:
+            chart_config["x_field"] = next(iter(actual_cols))
+        x_field = chart_config.get("x_field", "")
 
     if x_field and x_field not in actual_cols:
         if x_field.lower() in lower_map:
