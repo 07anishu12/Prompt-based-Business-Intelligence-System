@@ -130,16 +130,29 @@ export function buildAggregationModificationPrompt(
 
 export function getWidgetMetricConfig(widget: Widget): WidgetMetricConfig {
   const current = widget.chart_config.metric_config || {};
+  const showSummaryMetrics = widget.chart_config.showSummaryMetrics;
 
   return {
     ...DEFAULT_WIDGET_METRIC_CONFIG,
     ...current,
+    show_in_header:
+      typeof showSummaryMetrics === "boolean"
+        ? showSummaryMetrics
+        : (current.show_in_header ?? DEFAULT_WIDGET_METRIC_CONFIG.show_in_header),
     field: current.field || getMetricField(widget),
     visible_metrics:
       current.visible_metrics && current.visible_metrics.length > 0
         ? current.visible_metrics
         : DEFAULT_VISIBLE_SUMMARY_METRICS,
   };
+}
+
+export function getShowSummaryMetrics(widget: Widget): boolean {
+  if (typeof widget.chart_config.showSummaryMetrics === "boolean") {
+    return widget.chart_config.showSummaryMetrics;
+  }
+
+  return Boolean(getWidgetMetricConfig(widget).show_in_header ?? true);
 }
 
 export function getWidgetStyleConfig(widget: Widget): WidgetStyleConfig {
@@ -161,6 +174,12 @@ export function createChartConfig(
     ...getWidgetMetricConfig(widget),
     ...(updates.metric_config || {}),
   };
+  const showSummaryMetrics =
+    typeof updates.showSummaryMetrics === "boolean"
+      ? updates.showSummaryMetrics
+      : typeof current.showSummaryMetrics === "boolean"
+        ? current.showSummaryMetrics
+        : Boolean(mergedMetricConfig.show_in_header ?? true);
   const mergedStyleConfig: WidgetStyleConfig = {
     ...getWidgetStyleConfig(widget),
     ...(updates.style_config || {}),
@@ -206,6 +225,7 @@ export function createChartConfig(
     show_legend: Boolean(updates.show_legend ?? current.show_legend ?? defaultOptions.show_legend ?? true),
     show_tooltip: Boolean(updates.show_tooltip ?? current.show_tooltip ?? defaultOptions.show_tooltip ?? true),
     show_grid: Boolean(updates.show_grid ?? current.show_grid ?? defaultOptions.show_grid ?? true),
+    showSummaryMetrics,
     x_axis_label: String(updates.x_axis_label ?? current.x_axis_label ?? xField),
     y_axis_label: String(updates.y_axis_label ?? current.y_axis_label ?? metricField),
     metric_name: metricField,
@@ -216,6 +236,7 @@ export function createChartConfig(
     style_config: mergedStyleConfig,
     metric_config: {
       ...mergedMetricConfig,
+      show_in_header: showSummaryMetrics,
       field: String(updates.metric_name ?? mergedMetricConfig.field ?? metricField),
     },
   };

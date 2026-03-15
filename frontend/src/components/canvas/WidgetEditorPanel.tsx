@@ -388,7 +388,7 @@ export function WidgetEditorPanel({ widget, activeTab, onClose, onTabChange }: P
 
   if (!widget) {
     return (
-      <aside className="w-full border-t border-gray-200 bg-gray-50/80 lg:w-[360px] lg:border-l lg:border-t-0 dark:border-gray-800 dark:bg-gray-950/80">
+      <aside className="flex h-full w-[360px] shrink-0 border-slate-200 bg-gray-50/80 dark:border-slate-800 dark:bg-gray-950/80">
         <div className="flex h-full min-h-[240px] items-center justify-center p-6 text-center">
           <div>
             <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Select a card</h2>
@@ -402,7 +402,7 @@ export function WidgetEditorPanel({ widget, activeTab, onClose, onTabChange }: P
   }
 
   return (
-    <aside className="flex w-full flex-col border-t border-gray-200 bg-gray-50/80 lg:w-[360px] lg:border-l lg:border-t-0 dark:border-gray-800 dark:bg-gray-950/80">
+    <aside className="flex h-full w-[360px] shrink-0 flex-col bg-gray-50/80 dark:bg-gray-950/80">
       <div className="border-b border-gray-200 px-4 py-4 dark:border-gray-800">
         <div className="flex items-start justify-between gap-3">
           <div>

@@ -146,10 +146,12 @@ export const SUPPORTED_CHART_TYPES = [
   "pie",
   "donut",
   "scatter",
-  "radar",
-  "histogram",
   "heatmap",
   "stacked_bar",
+  "kpi",
+  "table",
+  "radar",
+  "histogram",
 ] as const;
 
 export function normalizeChartType(type: string): string {

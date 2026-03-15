@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from backend.models.connection import DataConnection
+from backend.services.connectors.base import QueryResult
 
 
 def _chart_config(**overrides):
@@ -47,6 +51,8 @@ async def _create_widget(
     title: str,
     layout_position: dict,
     chart_config: dict | None = None,
+    connection_id: str | None = None,
+    query_config: dict | None = None,
 ):
     response = await client.post(
         "/api/widgets",
@@ -54,7 +60,8 @@ async def _create_widget(
             "dashboard_id": dashboard_id,
             "type": "bar",
             "title": title,
-            "query_config": {"sql": "SELECT 1", "params": []},
+            "connection_id": connection_id,
+            "query_config": query_config or {"sql": "SELECT 1", "params": []},
             "chart_config": chart_config or _chart_config(),
             "layout_position": layout_position,
         },
@@ -163,3 +170,78 @@ async def test_widget_update_merges_layout_and_chart_extensions(client: AsyncCli
     assert updated["chart_config"]["y_axis_label"] == "Revenue label"
     assert updated["chart_config"]["card_description"] == "Updated from the editor panel"
     assert updated["chart_config"]["style_config"]["background_type"] == "gradient"
+
+
+@pytest.mark.asyncio
+async def test_widget_query_config_update_refreshes_cached_rows(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    test_user,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    dashboard_id = await _create_dashboard(client)
+    connection = DataConnection(
+        user_id=test_user.id,
+        name="Warehouse",
+        type="sqlite",
+        config={"database": ":memory:"},
+    )
+    db_session.add(connection)
+    await db_session.flush()
+
+    widget = await _create_widget(
+        client,
+        dashboard_id,
+        title="Revenue",
+        connection_id=str(connection.id),
+        query_config={"sql": "SELECT 1 AS value", "params": []},
+        layout_position={"x": 0, "y": 0, "w": 6, "h": 4},
+    )
+
+    class FakeConnector:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, list | None]] = []
+            self.disconnected = False
+
+        async def execute_query(self, sql: str, params: list | None = None) -> QueryResult:
+            self.calls.append((sql, params))
+            return QueryResult(
+                columns=["value"],
+                rows=[{"value": 99}],
+                row_count=1,
+                execution_ms=12,
+            )
+
+        async def disconnect(self) -> None:
+            self.disconnected = True
+
+    fake_connector = FakeConnector()
+    monkeypatch.setattr(
+        "backend.services.widget_service.ConnectorFactory.create",
+        lambda *_args, **_kwargs: fake_connector,
+    )
+
+    response = await client.put(
+        f"/api/widgets/{widget['id']}",
+        json={
+            "query_config": {
+                "sql": "SELECT ? AS value",
+                "params": [99],
+            }
+        },
+    )
+    assert response.status_code == 200
+
+    updated = response.json()
+    assert updated["connection_id"] == str(connection.id)
+    assert updated["query_config"] == {"sql": "SELECT ? AS value", "params": [99]}
+    assert updated["data"] == [{"value": 99}]
+    assert fake_connector.calls == [("SELECT ? AS value", [99])]
+    assert fake_connector.disconnected is True
+
+    get_response = await client.get(f"/api/widgets/{widget['id']}")
+    assert get_response.status_code == 200
+    persisted = get_response.json()
+    assert persisted["connection_id"] == str(connection.id)
+    assert persisted["query_config"] == {"sql": "SELECT ? AS value", "params": [99]}
+    assert persisted["data"] == [{"value": 99}]

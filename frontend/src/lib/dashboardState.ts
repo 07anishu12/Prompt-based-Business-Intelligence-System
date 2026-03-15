@@ -59,6 +59,14 @@ export function mergeWidget(widget: Widget, data: WidgetUpdate): Widget {
     ...widget,
     ...(data.title !== undefined ? { title: data.title } : {}),
     ...(data.type !== undefined ? { type: data.type } : {}),
+    ...(data.query_config !== undefined
+      ? {
+          query_config: {
+            ...(widget.query_config || {}),
+            ...(data.query_config as Widget["query_config"]),
+          },
+        }
+      : {}),
     ...(data.chart_config !== undefined
       ? { chart_config: data.chart_config as Widget["chart_config"] }
       : {}),

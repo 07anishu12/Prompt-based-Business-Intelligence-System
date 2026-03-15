@@ -5,7 +5,7 @@ export interface Dashboard {
   title: string;
   description?: string;
   layout: Record<string, unknown>;
-  settings: Record<string, unknown>;
+  settings: DashboardSettings;
   is_public: boolean;
   widget_count: number;
   created_at: string;
@@ -21,10 +21,30 @@ export interface DashboardCreate {
   description?: string;
 }
 
+export type CanvasPresetId =
+  | "presentation_16_9"
+  | "classic_4_3"
+  | "square_1_1"
+  | "ultrawide_21_9"
+  | "laptop_3_2"
+  | "mobile_9_16"
+  | "a4_landscape"
+  | "a4_portrait";
+
+export interface DashboardCanvasSettings {
+  preset_id: CanvasPresetId;
+  zoom: number;
+  show_grid: boolean;
+}
+
+export interface DashboardSettings extends Record<string, unknown> {
+  canvas?: DashboardCanvasSettings;
+}
+
 export interface DashboardUpdate {
   title?: string;
   description?: string;
-  settings?: Record<string, unknown>;
+  settings?: DashboardSettings;
 }
 
 export interface LayoutItem {

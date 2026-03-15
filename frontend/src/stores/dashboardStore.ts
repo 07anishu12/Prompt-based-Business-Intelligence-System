@@ -10,7 +10,7 @@ import {
   getWidgetMetricConfig,
   getWidgetStyleConfig,
 } from "@/lib/widgetConfig";
-import type { Dashboard, DashboardCreate, DashboardDetail, LayoutItem } from "@/types/dashboard";
+import type { Dashboard, DashboardCreate, DashboardDetail, DashboardUpdate, LayoutItem } from "@/types/dashboard";
 import type { Widget, WidgetMetricConfig, WidgetUpdate } from "@/types/widget";
 
 interface DashboardState {
@@ -23,6 +23,7 @@ interface DashboardState {
   fetchDashboard: (id: string) => Promise<void>;
   createDashboard: (data: DashboardCreate) => Promise<Dashboard>;
   deleteDashboard: (id: string) => Promise<void>;
+  updateDashboard: (id: string, data: DashboardUpdate) => Promise<Dashboard>;
   updateLayout: (id: string, items: LayoutItem[]) => Promise<void>;
 
   addWidget: (widget: Widget) => void;
@@ -76,6 +77,57 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   deleteDashboard: async (id) => {
     await dashboardApi.delete(id);
     set({ dashboards: get().dashboards.filter((d) => d.id !== id) });
+  },
+
+  updateDashboard: async (id, data) => {
+    const previousDashboard = get().currentDashboard;
+    const previousDashboards = get().dashboards;
+    const optimisticCurrent =
+      previousDashboard && previousDashboard.id === id
+        ? {
+            ...previousDashboard,
+            ...data,
+            settings: data.settings ?? previousDashboard.settings,
+          }
+        : previousDashboard;
+    const optimisticDashboards = previousDashboards.map((dashboard) =>
+      dashboard.id === id
+        ? {
+            ...dashboard,
+            ...data,
+            settings: data.settings ?? dashboard.settings,
+          }
+        : dashboard,
+    );
+
+    set({
+      currentDashboard: optimisticCurrent,
+      dashboards: optimisticDashboards,
+    });
+
+    try {
+      const updated = await dashboardApi.update(id, data);
+      set({
+        currentDashboard:
+          get().currentDashboard && get().currentDashboard?.id === id
+            ? {
+                ...get().currentDashboard!,
+                ...updated,
+                widgets: get().widgets,
+              }
+            : get().currentDashboard,
+        dashboards: get().dashboards.map((dashboard) =>
+          dashboard.id === id ? { ...dashboard, ...updated } : dashboard,
+        ),
+      });
+      return updated;
+    } catch (error) {
+      set({
+        currentDashboard: previousDashboard,
+        dashboards: previousDashboards,
+      });
+      throw error;
+    }
   },
 
   updateLayout: async (id, items) => {

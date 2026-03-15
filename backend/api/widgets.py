@@ -10,6 +10,7 @@ from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.api._helpers import widget_to_dict as _widget_response
 from backend.config import settings
 from backend.db.session import get_db_session
 from backend.dependencies import get_current_user
@@ -17,9 +18,7 @@ from backend.models.dashboard import Dashboard
 from backend.models.user import User
 from backend.models.widget import Widget
 from backend.schemas.widget import WidgetCreate, WidgetUpdate
-from backend.services.connectors.factory import ConnectorFactory
-from backend.utils.encryption import decrypt_config
-from backend.utils.helpers import to_json_compatible
+from backend.services.widget_service import refresh_widget_data
 
 router = APIRouter(prefix="/widgets", tags=["widgets"])
 
@@ -135,10 +134,18 @@ async def update_widget(
     db: AsyncSession = Depends(get_db_session),
 ):
     widget = await _get_widget_or_404(widget_id, user, db)
+    should_refresh_query = False
+
     if body.title is not None:
         widget.title = body.title
     if body.type is not None:
         widget.type = body.type
+    if body.query_config is not None:
+        widget.query_config = {
+            **(widget.query_config or {}),
+            **body.query_config,
+        }
+        should_refresh_query = bool({"sql", "params"} & set(body.query_config.keys()))
     if body.chart_config is not None:
         widget.chart_config = body.chart_config
     if body.layout_position is not None:
@@ -147,7 +154,21 @@ async def update_widget(
             body.layout_position,
         )
     await db.flush()
-    await db.refresh(widget)
+
+    if should_refresh_query:
+        try:
+            widget = await refresh_widget_data(widget, db, settings.JWT_SECRET)
+        except ValueError as exc:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+        except Exception as exc:
+            logger.error(f"Widget query update failed: {exc}")
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                f"Failed to refresh widget data: {exc}",
+            ) from exc
+    else:
+        await db.refresh(widget)
+
     payload = _widget_response(widget)
 
     sio = getattr(request.app.state, "sio", None)
@@ -291,39 +312,14 @@ async def refresh_widget(
 ):
     """Re-execute the widget's stored query against its connection."""
     widget = await _get_widget_or_404(widget_id, user, db)
-
-    sql = (widget.query_config or {}).get("sql")
-    if not sql:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Widget has no stored query")
-
-    if not widget.connection_id:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Widget has no connection")
-
-    # Get connection config
-    from backend.models.connection import DataConnection
-
-    result = await db.execute(
-        select(DataConnection).where(DataConnection.id == widget.connection_id)
-    )
-    db_conn = result.scalar_one_or_none()
-    if db_conn is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Connection not found")
-
-    config = decrypt_config(db_conn.config, settings.JWT_SECRET)
-    connector = ConnectorFactory.create(db_conn.type, config)
     try:
-        params = (widget.query_config or {}).get("params")
-        qr = await connector.execute_query(sql, params or None)
-        widget.cached_data = {"rows": to_json_compatible(qr.rows)}
-        await db.flush()
-        await db.refresh(widget)
+        widget = await refresh_widget_data(widget, db, settings.JWT_SECRET)
         return _widget_response(widget)
-    except Exception as e:
-        logger.error(f"Widget refresh failed: {e}")
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, f"Refresh failed: {e}")
-    finally:
-        await connector.disconnect()
-
-
-# Use shared widget serializer
-from backend.api._helpers import widget_to_dict as _widget_response
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    except Exception as exc:
+        logger.error(f"Widget refresh failed: {exc}")
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            f"Refresh failed: {exc}",
+        ) from exc

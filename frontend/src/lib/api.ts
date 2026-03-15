@@ -65,6 +65,8 @@ export const dashboardApi = {
   updateLayout: (id: string, widgets: LayoutItem[]) =>
     api.put(`/dashboards/${id}/layout`, { widgets }).then((r) => r.data),
   duplicate: (id: string) => api.post<Dashboard>(`/dashboards/${id}/duplicate`).then((r) => r.data),
+  share: (id: string) =>
+    api.post<{ is_public: boolean; share_url: string | null }>(`/dashboards/${id}/share`).then((r) => r.data),
 };
 
 // ── Widgets ──────────────────────────────────────────────────

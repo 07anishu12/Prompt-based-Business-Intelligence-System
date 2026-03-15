@@ -82,6 +82,7 @@ export interface ChartConfig {
   show_legend?: boolean;
   show_tooltip?: boolean;
   show_grid?: boolean;
+  showSummaryMetrics?: boolean;
   histogram_bins?: number;
   style_config?: WidgetStyleConfig;
   metric_config?: WidgetMetricConfig;
@@ -102,9 +103,11 @@ export interface LayoutPosition {
 export interface Widget {
   id: string;
   dashboard_id: string;
+  connection_id?: string | null;
   type: SupportedWidgetType | string;
   title?: string;
   prompt_used?: string;
+  query_config?: Record<string, unknown>;
   chart_config: ChartConfig;
   layout_position: LayoutPosition;
   data?: Record<string, unknown>[];
@@ -125,6 +128,7 @@ export interface WidgetCreate {
 export interface WidgetUpdate {
   title?: string;
   type?: string;
+  query_config?: Record<string, unknown>;
   chart_config?: Record<string, unknown>;
   layout_position?: Record<string, unknown>;
 }
