@@ -1,7 +1,10 @@
+import secrets
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.config import settings
 from backend.db.session import get_db_session
 from backend.dependencies import get_current_user
 from backend.middleware.rate_limiter import limiter
@@ -41,6 +44,34 @@ async def login(request: Request, body: UserLogin, db: AsyncSession = Depends(ge
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password"
         )
+
+    token = create_access_token(str(user.id), user.email)
+    return TokenResponse(access_token=token, user=UserRead.model_validate(user))
+
+
+@router.post("/dev-login", response_model=TokenResponse)
+@limiter.limit("30/minute")
+async def dev_login(request: Request, db: AsyncSession = Depends(get_db_session)):
+    if not settings.DEV_AUTH_BYPASS:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Development auth bypass is disabled",
+        )
+
+    result = await db.execute(select(User).where(User.email == settings.DEV_AUTH_EMAIL))
+    user = result.scalar_one_or_none()
+    if user is None:
+        user = User(
+            email=settings.DEV_AUTH_EMAIL,
+            name=settings.DEV_AUTH_NAME,
+            password_hash=hash_password(secrets.token_urlsafe(32)),
+        )
+        db.add(user)
+    elif user.name != settings.DEV_AUTH_NAME:
+        user.name = settings.DEV_AUTH_NAME
+
+    await db.commit()
+    await db.refresh(user)
 
     token = create_access_token(str(user.id), user.email)
     return TokenResponse(access_token=token, user=UserRead.model_validate(user))

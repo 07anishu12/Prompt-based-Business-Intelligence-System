@@ -1,104 +1,157 @@
 import {
+  Activity,
+  AreaChart,
   BarChart3,
+  Hash,
   LineChart,
   PieChart,
-  Table,
-  Hash,
-  AreaChart,
   ScatterChart,
+  Table,
 } from "lucide-react";
 
-// ── Default color palette ────────────────────────────────────
 export const DEFAULT_COLORS = [
-  "#3b82f6", // blue-500
-  "#10b981", // emerald-500
-  "#f59e0b", // amber-500
-  "#ef4444", // red-500
-  "#8b5cf6", // violet-500
-  "#ec4899", // pink-500
-  "#06b6d4", // cyan-500
-  "#f97316", // orange-500
-  "#14b8a6", // teal-500
-  "#a855f7", // purple-500
-  "#84cc16", // lime-500
-  "#e11d48", // rose-600
+  "#2563eb",
+  "#0f766e",
+  "#d97706",
+  "#dc2626",
+  "#7c3aed",
+  "#db2777",
+  "#0891b2",
+  "#ea580c",
+  "#16a34a",
+  "#be123c",
 ];
 
-// ── Chart type to lucide icon mapping ────────────────────────
 export const CHART_TYPE_ICONS: Record<string, typeof BarChart3> = {
   bar: BarChart3,
+  stacked_bar: BarChart3,
   line: LineChart,
   pie: PieChart,
+  donut: PieChart,
   table: Table,
   kpi: Hash,
   area: AreaChart,
   scatter: ScatterChart,
+  heatmap: Activity,
+  radar: Activity,
+  histogram: BarChart3,
 };
 
-// ── Default chart options per type ───────────────────────────
 export const DEFAULT_CHART_OPTIONS: Record<string, Record<string, unknown>> = {
   bar: {
     stacked: false,
     show_values: false,
     orientation: "vertical",
-    border_radius: 4,
-    bar_gap: 4,
     show_grid: true,
     show_legend: true,
-    animation_duration: 300,
+    show_tooltip: true,
+  },
+  stacked_bar: {
+    stacked: true,
+    show_values: false,
+    orientation: "vertical",
+    show_grid: true,
+    show_legend: true,
+    show_tooltip: true,
   },
   line: {
-    stroke_width: 2,
+    show_values: false,
     show_dots: false,
     curve_type: "monotone",
     show_grid: true,
     show_legend: true,
-    animation_duration: 300,
+    show_tooltip: true,
   },
   pie: {
-    inner_radius: 0,
-    outer_radius_percent: 80,
     show_labels: true,
     show_legend: true,
-    animation_duration: 300,
+    show_tooltip: true,
+  },
+  donut: {
+    donut: true,
+    show_labels: true,
+    show_legend: true,
+    show_tooltip: true,
   },
   area: {
-    stroke_width: 2,
-    fill_opacity: 0.3,
+    show_values: false,
     curve_type: "monotone",
     stacked: false,
     show_grid: true,
     show_legend: true,
-    animation_duration: 300,
+    show_tooltip: true,
   },
   scatter: {
-    dot_size: 6,
     show_grid: true,
     show_legend: true,
-    animation_duration: 300,
+    show_tooltip: true,
+  },
+  heatmap: {
+    show_tooltip: true,
+  },
+  radar: {
+    show_legend: true,
+    show_tooltip: true,
+    show_grid: true,
+  },
+  histogram: {
+    histogram_bins: 8,
+    show_grid: true,
+    show_tooltip: true,
   },
   table: {
     page_size: 50,
     striped: true,
     sortable: true,
-    show_row_numbers: false,
   },
   kpi: {
-    font_size: "3xl",
-    show_trend: true,
-    trend_period: "previous",
     prefix: "",
     suffix: "",
   },
 };
 
-// ── Human-readable chart type labels ─────────────────────────
 export const CHART_TYPE_LABELS: Record<string, string> = {
   bar: "Bar Chart",
+  stacked_bar: "Stacked Bar",
   line: "Line Chart",
   pie: "Pie Chart",
+  donut: "Donut Chart",
   table: "Data Table",
   kpi: "KPI Card",
   area: "Area Chart",
   scatter: "Scatter Plot",
+  heatmap: "Heatmap",
+  radar: "Radar Chart",
+  histogram: "Histogram",
 };
+
+export const CHART_TYPE_ALIASES: Record<string, string> = {
+  bar_chart: "bar",
+  line_chart: "line",
+  area_chart: "area",
+  pie_chart: "pie",
+  donut_chart: "donut",
+  scatter_plot: "scatter",
+  radar_chart: "radar",
+  histogram_chart: "histogram",
+  histogram: "histogram",
+  heatmap: "heatmap",
+  stacked_bar_chart: "stacked_bar",
+};
+
+export const SUPPORTED_CHART_TYPES = [
+  "bar",
+  "line",
+  "area",
+  "pie",
+  "donut",
+  "scatter",
+  "radar",
+  "histogram",
+  "heatmap",
+  "stacked_bar",
+] as const;
+
+export function normalizeChartType(type: string): string {
+  return CHART_TYPE_ALIASES[type] ?? type;
+}

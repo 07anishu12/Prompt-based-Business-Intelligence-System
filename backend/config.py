@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     PORT: int = 8000
     DEBUG: bool = False
 
+    # Development auth
+    DEV_AUTH_BYPASS: bool = False
+    DEV_AUTH_EMAIL: str = "dev@example.com"
+    DEV_AUTH_NAME: str = "Developer Demo User"
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 

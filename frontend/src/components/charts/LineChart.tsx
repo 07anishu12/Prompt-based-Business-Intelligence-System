@@ -1,24 +1,23 @@
-import React from "react";
 import {
-  LineChart as RechartsLineChart,
+  CartesianGrid,
+  Legend,
   Line,
+  LineChart as RechartsLineChart,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
 } from "recharts";
 
 const DEFAULT_COLORS = [
-  "#3b82f6",
-  "#10b981",
-  "#f59e0b",
-  "#ef4444",
-  "#8b5cf6",
-  "#ec4899",
-  "#06b6d4",
-  "#f97316",
+  "#2563eb",
+  "#0f766e",
+  "#d97706",
+  "#dc2626",
+  "#7c3aed",
+  "#db2777",
+  "#0891b2",
+  "#ea580c",
 ];
 
 export interface LineChartConfig {
@@ -27,6 +26,12 @@ export interface LineChartConfig {
   colors?: string[];
   show_values?: boolean;
   show_dots?: boolean;
+  show_legend?: boolean;
+  show_tooltip?: boolean;
+  show_grid?: boolean;
+  x_axis_label?: string;
+  y_axis_label?: string;
+  curve_type?: "linear" | "monotone" | "step";
 }
 
 interface LineChartProps {
@@ -41,35 +46,48 @@ export function LineChartComponent({ data, config }: LineChartProps) {
     colors = [],
     show_values = false,
     show_dots = false,
+    show_legend = true,
+    show_tooltip = true,
+    show_grid = true,
+    x_axis_label,
+    y_axis_label,
+    curve_type = "monotone",
   } = config;
 
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <RechartsLineChart
-        data={data}
-        margin={{ top: 10, right: 20, bottom: 5, left: 5 }}
-      >
-        <CartesianGrid
-          strokeDasharray="3 3"
-          className="stroke-gray-200 dark:stroke-gray-700"
+      <RechartsLineChart data={data} margin={{ top: 10, right: 20, bottom: 20, left: 10 }}>
+        {show_grid && (
+          <CartesianGrid
+            strokeDasharray="3 3"
+            className="stroke-gray-200 dark:stroke-gray-700"
+          />
+        )}
+        <XAxis
+          dataKey={x_field}
+          tick={{ fontSize: 11 }}
+          label={x_axis_label ? { value: x_axis_label, position: "insideBottom", offset: -10 } : undefined}
         />
-        <XAxis dataKey={x_field} tick={{ fontSize: 11 }} />
-        <YAxis tick={{ fontSize: 11 }} />
-        <Tooltip
-          contentStyle={{
-            borderRadius: "8px",
-            border: "none",
-            boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1)",
-          }}
+        <YAxis
+          tick={{ fontSize: 11 }}
+          label={y_axis_label ? { value: y_axis_label, angle: -90, position: "insideLeft" } : undefined}
         />
-        {y_fields.length > 1 && <Legend />}
-        {y_fields.map((field, i) => {
-          const color =
-            colors[i] || DEFAULT_COLORS[i % DEFAULT_COLORS.length];
+        {show_tooltip && (
+          <Tooltip
+            contentStyle={{
+              borderRadius: "8px",
+              border: "none",
+              boxShadow: "0 12px 30px rgba(15,23,42,0.12)",
+            }}
+          />
+        )}
+        {show_legend && y_fields.length > 1 && <Legend />}
+        {y_fields.map((field, index) => {
+          const color = colors[index] || DEFAULT_COLORS[index % DEFAULT_COLORS.length];
           return (
             <Line
               key={field}
-              type="monotone"
+              type={curve_type}
               dataKey={field}
               stroke={color}
               strokeWidth={2}
@@ -77,11 +95,7 @@ export function LineChartComponent({ data, config }: LineChartProps) {
               activeDot={{ r: 5, strokeWidth: 0 }}
               animationDuration={800}
               animationEasing="ease-out"
-              label={
-                show_values
-                  ? { position: "top", fontSize: 10, fill: "#6b7280" }
-                  : undefined
-              }
+              label={show_values ? { position: "top", fontSize: 10, fill: "#6b7280" } : undefined}
             />
           );
         })}

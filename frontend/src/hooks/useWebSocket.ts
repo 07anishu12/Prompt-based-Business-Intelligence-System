@@ -5,7 +5,7 @@ import type { LayoutPosition, Widget } from "@/types/widget";
 
 export function useWebSocket(dashboardId: string | undefined) {
   const socketRef = useRef<Socket | null>(null);
-  const { addWidget, setWidgets } = useDashboardStore();
+  const { addWidget, fetchDashboard, setWidgets } = useDashboardStore();
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -22,25 +22,40 @@ export function useWebSocket(dashboardId: string | undefined) {
       socket.emit("join_dashboard", { dashboard_id: dashboardId });
     });
 
-    socket.on("widget:created", (widget: Widget) => {
-      addWidget(widget);
+    socket.on("widget:created", (payload: Widget | { id?: string; widget_id?: string }) => {
+      if ("layout_position" in payload) {
+        addWidget(payload as Widget);
+        return;
+      }
+
+      void fetchDashboard(dashboardId);
     });
 
-    socket.on("widget:updated", (widget: Widget) => {
+    socket.on("widget:updated", (payload: Widget | { id?: string; widget_id?: string }) => {
+      if ("layout_position" in payload) {
+        const current = useDashboardStore.getState().widgets;
+        setWidgets(current.map((widget) => (widget.id === payload.id ? payload as Widget : widget)));
+        return;
+      }
+
+      void fetchDashboard(dashboardId);
+    });
+
+    socket.on("widget:deleted", (data: { id?: string; widget_id?: string }) => {
+      const deletedId = data.id ?? data.widget_id;
+      if (!deletedId) return;
       const current = useDashboardStore.getState().widgets;
-      setWidgets(current.map((w) => (w.id === widget.id ? widget : w)));
+      setWidgets(current.filter((widget) => widget.id !== deletedId));
     });
 
-    socket.on("widget:deleted", (data: { id: string }) => {
-      const current = useDashboardStore.getState().widgets;
-      setWidgets(current.filter((w) => w.id !== data.id));
-    });
-
-    socket.on("widget:moved", (data: { id: string; layout_position: LayoutPosition }) => {
+    socket.on("widget:moved", (data: { id?: string; widget_id?: string; layout_position?: LayoutPosition; position?: LayoutPosition }) => {
+      const movedId = data.id ?? data.widget_id;
+      const layoutPosition = data.layout_position ?? data.position;
+      if (!movedId || !layoutPosition) return;
       const current = useDashboardStore.getState().widgets;
       setWidgets(
-        current.map((w) =>
-          w.id === data.id ? { ...w, layout_position: data.layout_position } : w,
+        current.map((widget) =>
+          widget.id === movedId ? { ...widget, layout_position: layoutPosition } : widget,
         ),
       );
     });
@@ -55,7 +70,7 @@ export function useWebSocket(dashboardId: string | undefined) {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [dashboardId]);
+  }, [addWidget, dashboardId, fetchDashboard, setWidgets]);
 
   return socketRef;
 }

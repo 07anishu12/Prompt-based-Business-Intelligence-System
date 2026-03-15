@@ -28,13 +28,22 @@ CRITICAL RULES — FOLLOW EXACTLY:
 6. For rankings/top-N, ORDER BY metric DESC with LIMIT.
 7. For KPIs (single metric), return exactly one row with one numeric value.
 8. Include GROUP BY when using aggregations (SUM, COUNT, AVG, etc.).
-9. chart_type MUST be one of: bar, line, pie, donut, area, scatter, table, kpi.
+9. When the user asks for months, date ranges, or time windows, use the actual
+   date/datetime column from the schema and filter with ISO dates like
+   '2024-03-01' and '2024-12-31'. Never compare a date column to month names
+   like 'March' unless the schema explicitly has a textual month column.
+10. If a schema column is string-like but its sample values look like ISO dates,
+   CAST it to DATE before filtering or grouping.
+11. For monthly trends, group with DATE_TRUNC('month', <date_column>) and alias
+   that grouped value as month.
+12. chart_type MUST be one of: bar, line, pie, donut, area, scatter, heatmap,
+    radar, histogram, stacked_bar, table, kpi.
    Choose the most appropriate type for the data shape.
-10. x_field and y_fields in chart_config MUST exactly match the column aliases
+13. x_field and y_fields in chart_config MUST exactly match the column aliases
     you used in your SELECT clause. Double-check this before responding.
-11. If the query has a GROUP BY, x_field should be the grouped column
+14. If the query has a GROUP BY, x_field should be the grouped column
     and y_fields should be the aggregated column(s).
-12. Use double quotes around column names that contain spaces or special characters.
+15. Use double quotes around column names that contain spaces or special characters.
 
 Respond ONLY with valid JSON (no markdown, no code fences, no explanation outside JSON):
 {{
@@ -65,17 +74,28 @@ class QueryGenerationError(Exception):
     """Claude couldn't generate a valid query."""
 
 
-async def generate(
-    prompt: str,
-    schema_context: str,
-    intent: str,
+_ALLOWED_CHART_TYPES = {
+    "bar",
+    "line",
+    "pie",
+    "donut",
+    "area",
+    "scatter",
+    "heatmap",
+    "radar",
+    "histogram",
+    "stacked_bar",
+    "table",
+    "kpi",
+}
+
+
+async def _run_generation(
+    *,
+    system: str,
+    user_msg: str,
     claude_client,
 ) -> GeneratedQuery:
-    """Call Claude API to generate a SQL query from natural language."""
-    system = _SYSTEM_PROMPT.format(schema_context=schema_context)
-
-    user_msg = f"Intent: {intent}\nUser request: {prompt}"
-
     for attempt in range(2):  # Retry once on malformed response
         try:
             from backend.config import settings
@@ -91,9 +111,7 @@ async def generate(
             data = json.loads(raw_text)
             result = GeneratedQuery.model_validate(data)
 
-            # Validate chart_type is in allowed set
-            allowed_types = {"bar", "line", "pie", "donut", "area", "scatter", "table", "kpi"}
-            if result.chart_type not in allowed_types:
+            if result.chart_type not in _ALLOWED_CHART_TYPES:
                 logger.warning(f"Invalid chart_type '{result.chart_type}', defaulting to 'bar'")
                 result.chart_type = "bar"
 
@@ -114,6 +132,41 @@ async def generate(
             raise QueryGenerationError(f"Failed to generate query: {e}") from e
 
     raise QueryGenerationError("Query generation failed after retries")
+
+
+async def generate(
+    prompt: str,
+    schema_context: str,
+    intent: str,
+    claude_client,
+) -> GeneratedQuery:
+    """Call Claude API to generate a SQL query from natural language."""
+    system = _SYSTEM_PROMPT.format(schema_context=schema_context)
+    user_msg = f"Intent: {intent}\nUser request: {prompt}"
+    return await _run_generation(system=system, user_msg=user_msg, claude_client=claude_client)
+
+
+async def repair(
+    *,
+    prompt: str,
+    schema_context: str,
+    intent: str,
+    previous_sql: str,
+    feedback: str,
+    claude_client,
+) -> GeneratedQuery:
+    """Retry generation with concrete validation or execution feedback."""
+    system = _SYSTEM_PROMPT.format(schema_context=schema_context)
+    user_msg = (
+        f"Intent: {intent}\n"
+        f"Original user request: {prompt}\n\n"
+        "The previous SQL was rejected or produced unusable results.\n"
+        f"Previous SQL:\n{previous_sql}\n\n"
+        f"Feedback to fix:\n{feedback}\n\n"
+        "Return corrected JSON only. Preserve the user's requested metric, filters, "
+        "and time range, but fix any invalid columns, tables, or date filters."
+    )
+    return await _run_generation(system=system, user_msg=user_msg, claude_client=claude_client)
 
 
 def _extract_json(text: str) -> str:

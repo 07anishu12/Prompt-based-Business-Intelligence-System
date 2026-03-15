@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import clsx from "clsx";
 import { ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 

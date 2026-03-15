@@ -10,6 +10,8 @@ This reduces hallucination by:
 
 from __future__ import annotations
 
+from calendar import monthrange
+from datetime import date
 import re
 
 from loguru import logger
@@ -55,12 +57,19 @@ def optimize_prompt(
         hints_str = ", ".join(f"{col} ({typ})" for col, typ in type_hints.items())
         parts.append(f"[COLUMN TYPES: {hints_str}]")
 
+    date_range_hint = _extract_date_range_hint(raw_prompt)
+    if date_range_hint:
+        parts.append(f"[DATE RANGE HINT: {date_range_hint}]")
+
     # Add explicit instructions to reduce hallucination
     parts.append(
         "\n[IMPORTANT: Only use tables and columns listed above. "
         "If the user's requested field doesn't match any column exactly, "
         "use the closest matching column from the MATCHED COLUMNS list. "
         "Never invent table or column names. "
+        "If the prompt asks for a month or date range, convert it to concrete "
+        "ISO date boundaries for DATE/TIMESTAMP columns instead of using "
+        "month-name string comparisons. "
         "All column aliases in SELECT must be valid identifiers.]"
     )
 
@@ -132,6 +141,34 @@ _REVERSE_SYNONYMS: dict[str, str] = {}
 for _canonical, _syns in _SYNONYMS.items():
     for _syn in _syns:
         _REVERSE_SYNONYMS[_syn] = _canonical
+
+
+_MONTH_LOOKUP = {
+    "january": 1,
+    "february": 2,
+    "march": 3,
+    "april": 4,
+    "may": 5,
+    "june": 6,
+    "july": 7,
+    "august": 8,
+    "september": 9,
+    "october": 10,
+    "november": 11,
+    "december": 12,
+    "jan": 1,
+    "feb": 2,
+    "mar": 3,
+    "apr": 4,
+    "jun": 6,
+    "jul": 7,
+    "aug": 8,
+    "sep": 9,
+    "sept": 9,
+    "oct": 10,
+    "nov": 11,
+    "dec": 12,
+}
 
 
 def _fuzzy_match_columns(prompt: str, columns: list[str]) -> list[str]:
@@ -229,3 +266,53 @@ def _fuzzy_match_tables(prompt: str, tables: list[str]) -> list[str]:
                 break
 
     return matched
+
+
+def _extract_date_range_hint(prompt: str) -> str | None:
+    prompt_lower = prompt.lower()
+
+    range_match = re.search(
+        r"\b(?:from|between)\s+([a-z]+)\s+(?:to|and)\s+([a-z]+)\s+(\d{4})\b",
+        prompt_lower,
+    )
+    if range_match:
+        start_name, end_name, year_text = range_match.groups()
+        start_month = _MONTH_LOOKUP.get(start_name)
+        end_month = _MONTH_LOOKUP.get(end_name)
+        if start_month and end_month:
+            year = int(year_text)
+            start_date = date(year, start_month, 1)
+            inclusive_end = date(year, end_month, monthrange(year, end_month)[1])
+            next_month = end_month + 1
+            next_year = year
+            if next_month == 13:
+                next_month = 1
+                next_year += 1
+            exclusive_end = date(next_year, next_month, 1)
+            return (
+                "Use ISO dates for the requested range. "
+                f"Recommended filter: date_column >= '{start_date.isoformat()}' "
+                f"AND date_column < '{exclusive_end.isoformat()}' "
+                f"(inclusive end date is '{inclusive_end.isoformat()}')."
+            )
+
+    single_month_match = re.search(r"\bin\s+([a-z]+)\s+(\d{4})\b", prompt_lower)
+    if single_month_match:
+        month_name, year_text = single_month_match.groups()
+        month_number = _MONTH_LOOKUP.get(month_name)
+        if month_number:
+            year = int(year_text)
+            start_date = date(year, month_number, 1)
+            next_month = month_number + 1
+            next_year = year
+            if next_month == 13:
+                next_month = 1
+                next_year += 1
+            exclusive_end = date(next_year, next_month, 1)
+            return (
+                "Use ISO dates for the requested month. "
+                f"Recommended filter: date_column >= '{start_date.isoformat()}' "
+                f"AND date_column < '{exclusive_end.isoformat()}'."
+            )
+
+    return None

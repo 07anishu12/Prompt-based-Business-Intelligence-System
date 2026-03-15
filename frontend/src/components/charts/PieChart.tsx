@@ -1,22 +1,21 @@
-import React from "react";
 import {
-  PieChart as RechartsPieChart,
-  Pie,
   Cell,
-  Tooltip,
   Legend,
+  Pie,
+  PieChart as RechartsPieChart,
   ResponsiveContainer,
+  Tooltip,
 } from "recharts";
 
 const DEFAULT_COLORS = [
-  "#3b82f6",
-  "#10b981",
-  "#f59e0b",
-  "#ef4444",
-  "#8b5cf6",
-  "#ec4899",
-  "#06b6d4",
-  "#f97316",
+  "#2563eb",
+  "#0f766e",
+  "#d97706",
+  "#dc2626",
+  "#7c3aed",
+  "#db2777",
+  "#0891b2",
+  "#ea580c",
 ];
 
 export interface PieChartConfig {
@@ -25,6 +24,8 @@ export interface PieChartConfig {
   colors?: string[];
   donut?: boolean;
   show_values?: boolean;
+  show_legend?: boolean;
+  show_tooltip?: boolean;
 }
 
 interface PieChartProps {
@@ -80,6 +81,8 @@ export function PieChartComponent({ data, config }: PieChartProps) {
     colors = [],
     donut = false,
     show_values = true,
+    show_legend = true,
+    show_tooltip = true,
   } = config;
 
   const valueField = y_fields[0];
@@ -101,21 +104,23 @@ export function PieChartComponent({ data, config }: PieChartProps) {
           animationDuration={600}
           animationEasing="ease-out"
         >
-          {data.map((_, i) => (
+          {data.map((_, index) => (
             <Cell
-              key={`cell-${i}`}
-              fill={colors[i] || DEFAULT_COLORS[i % DEFAULT_COLORS.length]}
+              key={`cell-${index}`}
+              fill={colors[index] || DEFAULT_COLORS[index % DEFAULT_COLORS.length]}
             />
           ))}
         </Pie>
-        <Tooltip
-          contentStyle={{
-            borderRadius: "8px",
-            border: "none",
-            boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1)",
-          }}
-        />
-        <Legend />
+        {show_tooltip && (
+          <Tooltip
+            contentStyle={{
+              borderRadius: "8px",
+              border: "none",
+              boxShadow: "0 12px 30px rgba(15,23,42,0.12)",
+            }}
+          />
+        )}
+        {show_legend && <Legend />}
       </RechartsPieChart>
     </ResponsiveContainer>
   );

@@ -23,6 +23,7 @@ class LayoutPosition(BaseModel):
     h: int
     min_w: int = 2
     min_h: int = 2
+    position: Optional[int] = None
 
 
 class WidgetCreate(BaseModel):

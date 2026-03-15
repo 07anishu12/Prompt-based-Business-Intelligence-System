@@ -8,7 +8,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "${PROMPT_BI_POSTGRES_PORT:-5432}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U bi_user -d prompt_bi"]
       interval: 5s
@@ -20,7 +20,7 @@ services:
     volumes:
       - redis_data:/data
     ports:
-      - "6379:6379"
+      - "${PROMPT_BI_REDIS_PORT:-6379}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -37,7 +37,7 @@ services:
     env_file:
       - .env
     ports:
-      - "8000:8000"
+      - "${PROMPT_BI_BACKEND_PORT:-8000}:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -56,7 +56,7 @@ services:
       context: .
       dockerfile: frontend.Dockerfile
     ports:
-      - "80:80"
+      - "${PROMPT_BI_HTTP_PORT:-80}:80"
     depends_on:
       backend:
         condition: service_healthy

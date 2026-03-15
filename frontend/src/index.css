@@ -89,22 +89,118 @@
 
 .react-resizable-handle {
   position: absolute;
-  width: 20px;
-  height: 20px;
-  bottom: 0;
-  right: 0;
-  cursor: se-resize;
+  z-index: 4;
 }
 
 .react-resizable-handle::after {
   content: "";
   position: absolute;
-  right: 3px;
-  bottom: 3px;
-  width: 6px;
-  height: 6px;
-  border-right: 2px solid rgba(0, 0, 0, 0.2);
-  border-bottom: 2px solid rgba(0, 0, 0, 0.2);
+  border-radius: 9999px;
+  background: rgb(59 130 246 / 0.35);
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.react-grid-item:hover .react-resizable-handle::after,
+.react-grid-item.resizing .react-resizable-handle::after {
+  opacity: 1;
+}
+
+.react-resizable-handle-n,
+.react-resizable-handle-s {
+  left: 50%;
+  width: 34px;
+  height: 12px;
+  transform: translateX(-50%);
+}
+
+.react-resizable-handle-n {
+  top: -6px;
+  cursor: n-resize;
+}
+
+.react-resizable-handle-s {
+  bottom: -6px;
+  cursor: s-resize;
+}
+
+.react-resizable-handle-n::after,
+.react-resizable-handle-s::after {
+  left: 50%;
+  top: 50%;
+  width: 18px;
+  height: 3px;
+  transform: translate(-50%, -50%);
+}
+
+.react-resizable-handle-e,
+.react-resizable-handle-w {
+  top: 50%;
+  width: 12px;
+  height: 34px;
+  transform: translateY(-50%);
+}
+
+.react-resizable-handle-e {
+  right: -6px;
+  cursor: e-resize;
+}
+
+.react-resizable-handle-w {
+  left: -6px;
+  cursor: w-resize;
+}
+
+.react-resizable-handle-e::after,
+.react-resizable-handle-w::after {
+  left: 50%;
+  top: 50%;
+  width: 3px;
+  height: 18px;
+  transform: translate(-50%, -50%);
+}
+
+.react-resizable-handle-ne,
+.react-resizable-handle-nw,
+.react-resizable-handle-se,
+.react-resizable-handle-sw {
+  width: 18px;
+  height: 18px;
+}
+
+.react-resizable-handle-ne {
+  top: -6px;
+  right: -6px;
+  cursor: ne-resize;
+}
+
+.react-resizable-handle-nw {
+  top: -6px;
+  left: -6px;
+  cursor: nw-resize;
+}
+
+.react-resizable-handle-se {
+  right: -6px;
+  bottom: -6px;
+  cursor: se-resize;
+}
+
+.react-resizable-handle-sw {
+  left: -6px;
+  bottom: -6px;
+  cursor: sw-resize;
+}
+
+.react-resizable-handle-ne::after,
+.react-resizable-handle-nw::after,
+.react-resizable-handle-se::after,
+.react-resizable-handle-sw::after {
+  left: 50%;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  transform: translate(-50%, -50%);
 }
 
 /* ── Page transition ────────────────────────────────────────── */

@@ -58,6 +58,21 @@ docker compose -f docker-compose.dev.yml exec backend alembic upgrade head
 # API docs: http://localhost:8000/docs
 ```
 
+#### Single-command local dev (no Docker)
+
+```bash
+# Install tooling at repo root (for concurrently)
+npm install
+
+# Install frontend dependencies
+npm --prefix frontend install
+
+# Run backend + frontend together
+npm run dev:all
+```
+
+For a local demo without creating an account, set `DEV_AUTH_BYPASS=true` in `.env` and use `Use Developer Sign In` on the auth page. Keep it disabled outside local development.
+
 ## Environment Variables
 
 | Variable | Description | Default |
@@ -71,6 +86,9 @@ docker compose -f docker-compose.dev.yml exec backend alembic upgrade head
 | `UPLOAD_DIR` | Directory for uploaded files | `./uploads` |
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID | *(optional)* |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret | *(optional)* |
+| `DEV_AUTH_BYPASS` | Enable local-only mock sign-in endpoint | `false` |
+| `DEV_AUTH_EMAIL` | Demo account email for dev sign-in | `dev@example.com` |
+| `DEV_AUTH_NAME` | Demo account name for dev sign-in | `Developer Demo User` |
 
 ## Data Sources
 

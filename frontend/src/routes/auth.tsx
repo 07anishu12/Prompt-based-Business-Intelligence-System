@@ -37,8 +37,9 @@ export default function AuthPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const { login, register } = useAuthStore();
+  const { login, devLogin, register } = useAuthStore();
   const navigate = useNavigate();
+  const showDevLogin = ["localhost", "127.0.0.1"].includes(window.location.hostname);
 
   const strength = useMemo(() => getPasswordStrength(password), [password]);
 
@@ -65,6 +66,22 @@ export default function AuthPage() {
       } else {
         await register(email, name, password);
       }
+      navigate("/");
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data
+          ?.detail || "Something went wrong";
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDevLogin = async () => {
+    setError("");
+    setLoading(true);
+    try {
+      await devLogin();
       navigate("/");
     } catch (err: unknown) {
       const msg =
@@ -237,6 +254,17 @@ export default function AuthPage() {
                   ? "Sign In"
                   : "Create Account"}
             </button>
+
+            {tab === "login" && showDevLogin && (
+              <button
+                type="button"
+                onClick={handleDevLogin}
+                disabled={loading}
+                className="w-full rounded-lg border border-dashed border-blue-300 bg-blue-50 py-2.5 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100 disabled:opacity-50 dark:border-blue-700 dark:bg-blue-950/40 dark:text-blue-200 dark:hover:bg-blue-950/60"
+              >
+                Use Developer Sign In
+              </button>
+            )}
           </form>
         </div>
       </div>

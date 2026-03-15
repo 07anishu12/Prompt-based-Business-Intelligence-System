@@ -24,6 +24,7 @@ from backend.schemas.prompt import (
     PromptResponse,
     PromptSuggestResponse,
 )
+from backend.api._helpers import widget_to_dict as _widget_response
 from backend.services.connectors.factory import ConnectorFactory
 from backend.services.prompt_engine.engine import PromptEngine
 from backend.services.prompt_engine.schema_context import build_context
@@ -55,9 +56,10 @@ async def process_prompt(
     if body.dashboard_id and result.widget.id:
         sio = getattr(request.app.state, "sio", None)
         if sio:
+            widget = await db.get(Widget, uuid.UUID(result.widget.id))
             await sio.emit(
                 "widget:created",
-                {"widget_id": result.widget.id, "title": result.widget.title},
+                _widget_response(widget) if widget else {"id": result.widget.id},
                 room=body.dashboard_id,
                 namespace="/dashboard",
             )
@@ -234,13 +236,15 @@ async def modify_widget(
     widget.title = response.widget.title
     widget.cached_data = {"rows": response.widget.data}
     await db.flush()
+    await db.refresh(widget)
+    response.widget.id = str(widget.id)
 
     # Emit WebSocket event
     sio = getattr(request.app.state, "sio", None)
     if sio:
         await sio.emit(
             "widget:updated",
-            {"widget_id": str(widget.id), "title": widget.title},
+            _widget_response(widget),
             room=str(widget.dashboard_id),
             namespace="/dashboard",
         )

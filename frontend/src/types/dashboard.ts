@@ -33,4 +33,5 @@ export interface LayoutItem {
   y: number;
   w: number;
   h: number;
+  position?: number;
 }

@@ -65,6 +65,17 @@ def _find_next_position(existing_positions: list[dict]) -> tuple[int, int]:
     return 0, max_y_bottom
 
 
+def _find_next_order(existing_positions: list[dict]) -> int:
+    """Assign a stable order index for newly created widgets."""
+    if not existing_positions:
+        return 0
+
+    return max(
+        int(position.get("position", index))
+        for index, position in enumerate(existing_positions)
+    ) + 1
+
+
 def build_widget(
     prompt: str,
     query_result: list[dict[str, Any]],
@@ -107,6 +118,7 @@ def build_widget(
         h=layout_defaults["h"],
         min_w=layout_defaults["min_w"],
         min_h=layout_defaults["min_h"],
+        position=_find_next_order(existing_positions or []),
     )
 
     # Query config (stored so widget can be refreshed later)

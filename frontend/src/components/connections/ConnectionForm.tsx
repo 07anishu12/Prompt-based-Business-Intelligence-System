@@ -110,6 +110,11 @@ export function ConnectionForm({ onComplete }: ConnectionFormProps) {
   const [createdConnectionId, setCreatedConnectionId] = useState<string | null>(null);
 
   const { createConnection, testConnection } = useConnectionStore();
+  const connectionTypeLabel =
+    CONNECTION_TYPES.find((ct) => ct.type === selectedType)?.label ?? "";
+  const hasHost = Boolean(config.host);
+  const hasDatabase = Boolean(config.database);
+  const hasFilename = Boolean(config.filename);
 
   // ── Navigation ─────────────────────────────────────────────
 
@@ -446,10 +451,10 @@ export function ConnectionForm({ onComplete }: ConnectionFormProps) {
                 <div className="flex justify-between">
                   <span className="text-gray-500">Type</span>
                   <span className="font-medium text-gray-900 dark:text-white">
-                    {CONNECTION_TYPES.find((ct) => ct.type === selectedType)?.label}
+                    {connectionTypeLabel}
                   </span>
                 </div>
-                {config.host && (
+                {hasHost && (
                   <div className="flex justify-between">
                     <span className="text-gray-500">Host</span>
                     <span className="font-mono text-gray-900 dark:text-white">
@@ -457,7 +462,7 @@ export function ConnectionForm({ onComplete }: ConnectionFormProps) {
                     </span>
                   </div>
                 )}
-                {config.database && (
+                {hasDatabase && (
                   <div className="flex justify-between">
                     <span className="text-gray-500">Database</span>
                     <span className="font-mono text-gray-900 dark:text-white">
@@ -465,7 +470,7 @@ export function ConnectionForm({ onComplete }: ConnectionFormProps) {
                     </span>
                   </div>
                 )}
-                {config.filename && (
+                {hasFilename && (
                   <div className="flex justify-between">
                     <span className="text-gray-500">File</span>
                     <span className="font-mono text-gray-900 dark:text-white">

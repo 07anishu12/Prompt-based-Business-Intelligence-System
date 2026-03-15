@@ -130,10 +130,14 @@ function ColumnNode({ column }: ColumnNodeProps) {
       </span>
       <span className="ml-auto flex items-center gap-1">
         {column.is_primary_key && (
-          <Key size={11} className="text-yellow-500" title="Primary Key" />
+          <span title="Primary Key">
+            <Key size={11} className="text-yellow-500" />
+          </span>
         )}
         {column.is_foreign_key && (
-          <Link2 size={11} className="text-blue-500" title="Foreign Key" />
+          <span title="Foreign Key">
+            <Link2 size={11} className="text-blue-500" />
+          </span>
         )}
         <span
           className={clsx(

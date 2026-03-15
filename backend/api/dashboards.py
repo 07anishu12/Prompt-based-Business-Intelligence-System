@@ -75,6 +75,19 @@ def _dashboard_to_read(d: Dashboard) -> dict:
     }
 
 
+def _widget_sort_key(widget: Widget) -> tuple[int, int, int, str]:
+    layout = widget.layout_position or {}
+    position = layout.get("position")
+    fallback_position = 10_000
+
+    return (
+        int(position) if position is not None else fallback_position,
+        int(layout.get("y", 0)),
+        int(layout.get("x", 0)),
+        str(widget.created_at),
+    )
+
+
 # Use shared widget serializer
 from backend.api._helpers import widget_to_dict as _widget_to_dict
 
@@ -123,7 +136,7 @@ async def get_dashboard(
 ):
     d = await _get_dashboard_or_404(dashboard_id, user, db)
     data = _dashboard_to_read(d)
-    data["widgets"] = [_widget_to_dict(w) for w in d.widgets]
+    data["widgets"] = [_widget_to_dict(w) for w in sorted(d.widgets, key=_widget_sort_key)]
     return data
 
 
@@ -160,11 +173,18 @@ async def update_layout(
     # Pre-fetch all affected widgets in a single query
     widget_ids = []
     positions_map: dict[uuid.UUID, dict] = {}
-    for item in body.widgets:
+    for index, item in enumerate(body.widgets):
         try:
             w_uuid = uuid.UUID(item.id)
             widget_ids.append(w_uuid)
-            positions_map[w_uuid] = {"x": item.x, "y": item.y, "w": item.w, "h": item.h}
+            position_data = {
+                "x": item.x,
+                "y": item.y,
+                "w": item.w,
+                "h": item.h,
+                "position": item.position if item.position is not None else index,
+            }
+            positions_map[w_uuid] = position_data
         except ValueError:
             continue
 
@@ -174,7 +194,10 @@ async def update_layout(
         )
         widgets = result.scalars().all()
         for widget in widgets:
-            widget.layout_position = positions_map[widget.id]
+            widget.layout_position = {
+                **(widget.layout_position or {}),
+                **positions_map[widget.id],
+            }
 
     await db.flush()
 

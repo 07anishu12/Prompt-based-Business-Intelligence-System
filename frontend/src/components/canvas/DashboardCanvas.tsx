@@ -2,8 +2,10 @@ import { useCallback, useRef, useMemo } from "react";
 import { Responsive, WidthProvider, type Layout } from "react-grid-layout";
 import { Plus, Sparkles } from "lucide-react";
 import { clsx } from "clsx";
+import { buildOrderedLayout } from "@/lib/widgetConfig";
 import { useDashboardStore } from "@/stores/dashboardStore";
 import { WidgetWrapper } from "./WidgetWrapper";
+import type { EditorTab } from "./WidgetCardToolbar";
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
 
@@ -11,9 +13,19 @@ interface Props {
   dashboardId: string;
   showGrid: boolean;
   onPromptFocus: () => void;
+  selectedWidgetId: string | null;
+  onSelectWidget: (widgetId: string) => void;
+  onOpenWidgetTab: (widgetId: string, tab: EditorTab) => void;
 }
 
-export function DashboardCanvas({ dashboardId, showGrid, onPromptFocus }: Props) {
+export function DashboardCanvas({
+  dashboardId,
+  showGrid,
+  onPromptFocus,
+  selectedWidgetId,
+  onSelectWidget,
+  onOpenWidgetTab,
+}: Props) {
   const { widgets, updateLayout } = useDashboardStore();
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
@@ -31,18 +43,19 @@ export function DashboardCanvas({ dashboardId, showGrid, onPromptFocus }: Props)
 
   const handleLayoutChange = useCallback(
     (layout: Layout[]) => {
-      // Debounce save to 2 seconds
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       saveTimerRef.current = setTimeout(() => {
-        const items = layout.map((l) => ({
-          id: l.i,
-          x: l.x,
-          y: l.y,
-          w: l.w,
-          h: l.h,
-        }));
+        const items = buildOrderedLayout(
+          layout.map((item) => ({
+            id: item.i,
+            x: item.x,
+            y: item.y,
+            w: item.w,
+            h: item.h,
+          })),
+        );
         updateLayout(dashboardId, items);
-      }, 2000);
+      }, 250);
     },
     [dashboardId, updateLayout],
   );
@@ -85,14 +98,20 @@ export function DashboardCanvas({ dashboardId, showGrid, onPromptFocus }: Props)
         cols={{ lg: 24, md: 16, sm: 8, xs: 4 }}
         rowHeight={40}
         margin={[8, 8]}
-        compactType="vertical"
+        compactType={null}
         preventCollision={false}
         draggableHandle=".drag-handle"
+        resizeHandles={["n", "s", "e", "w", "ne", "nw", "se", "sw"]}
         onLayoutChange={handleLayoutChange}
       >
         {widgets.map((widget) => (
           <div key={widget.id}>
-            <WidgetWrapper widget={widget} />
+            <WidgetWrapper
+              widget={widget}
+              isSelected={selectedWidgetId === widget.id}
+              onSelect={onSelectWidget}
+              onOpenTab={(tab) => onOpenWidgetTab(widget.id, tab)}
+            />
           </div>
         ))}
       </ResponsiveGridLayout>

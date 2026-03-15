@@ -44,6 +44,7 @@ class LayoutItem(BaseModel):
     y: int
     w: int
     h: int
+    position: Optional[int] = None
 
 
 class LayoutUpdate(BaseModel):

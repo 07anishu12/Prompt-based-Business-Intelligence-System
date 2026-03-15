@@ -47,6 +47,7 @@ export const authApi = {
     api.post<TokenResponse>("/auth/register", data).then((r) => r.data),
   login: (data: { email: string; password: string }) =>
     api.post<TokenResponse>("/auth/login", data).then((r) => r.data),
+  devLogin: () => api.post<TokenResponse>("/auth/dev-login").then((r) => r.data),
   me: () => api.get<AuthUser>("/auth/me").then((r) => r.data),
   updateMe: (data: { name?: string; email?: string }) =>
     api.put<AuthUser>("/auth/me", data).then((r) => r.data),
@@ -73,6 +74,7 @@ export const widgetApi = {
   create: (data: WidgetCreate) => api.post<Widget>("/widgets", data).then((r) => r.data),
   update: (id: string, data: WidgetUpdate) =>
     api.put<Widget>(`/widgets/${id}`, data).then((r) => r.data),
+  duplicate: (id: string) => api.post<Widget>(`/widgets/${id}/duplicate`).then((r) => r.data),
   delete: (id: string) => api.delete(`/widgets/${id}`),
   refresh: (id: string) => api.post<Widget>(`/widgets/${id}/refresh`).then((r) => r.data),
 };
@@ -95,6 +97,13 @@ export const connectionApi = {
 export const promptApi = {
   send: (data: PromptRequest) =>
     api.post<PromptResponse>("/prompt", data).then((r) => r.data),
+  modifyWidget: (widgetId: string, modificationPrompt: string) =>
+    api
+      .post<PromptResponse>("/prompt/modify", {
+        widget_id: widgetId,
+        modification_prompt: modificationPrompt,
+      })
+      .then((r) => r.data),
   suggest: (connectionId?: string) =>
     api
       .post<{ suggestions: string[] }>("/prompt/suggest", {

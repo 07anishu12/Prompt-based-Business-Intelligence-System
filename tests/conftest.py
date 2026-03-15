@@ -22,7 +22,7 @@ from backend.models.user import User
 # ---------------------------------------------------------------------------
 TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL",
-    "sqlite+aiosqlite:///",
+    "sqlite+aiosqlite:///:memory:",
 )
 
 _test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
