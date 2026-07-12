@@ -1,136 +1,90 @@
 # Prompt BI
 
-A natural-language Business Intelligence platform. Type prompts like *"Show monthly revenue by region as a bar chart"* and get instant visualizations, tables, and KPI cards — then drag them onto a dashboard canvas.
+> A natural-language business-intelligence platform that turns a question into a validated query, an appropriate visualization, and an interactive dashboard widget.
 
-## 🏗 Architecture Overview
+Prompt BI is an end-to-end application for exploring structured data without writing SQL manually. A user can ask for a question such as _“Show monthly revenue by region as a bar chart”_; the platform builds schema-aware context, generates a query and chart recommendation, validates the query, executes it through a connector, and renders the resulting widget in a dashboard.
 
-The system is structured as a modern web application with a decoupled frontend and backend, powered by an AI-driven Prompt Engine.
+## Why it exists
 
-```text
-Frontend (React + TypeScript)          Backend (Python / FastAPI)
-┌──────────────────────────┐           ┌──────────────────────────┐
-│ Prompt Bar & UI          │  HTTP/WS  │ API & Auth               │
-│ Dashboard Canvas (Grid)  │◄────────►│ Prompt Engine (Claude AI)│
-│ Connections & Widgets    │           │ Query Engine & Services  │
-└──────────────────────────┘           └──────────┬───────────────┘
-                                                  │
-                                       ┌──────────┴───────────────┐
-                                       │ Data Connector Layer     │
-                                       │ (SQL, DuckDB, GDrive)    │
-                                       └──────────────────────────┘
-```
+Business teams want self-service answers, while data teams need control over schema access, query safety, and auditability. Prompt BI is designed around that boundary: natural language improves access to data, but the generated query must still pass through explicit validation and a data-connector layer.
 
-### Core Modules
+## Core capabilities
 
-- **Frontend:** Built with React 18, TypeScript, and Vite. Uses Zustand for state management, Recharts for visualizations, and `react-grid-layout` for the drag-and-drop dashboard canvas.
-- **Backend:** Asynchronous Python application powered by FastAPI and SQLAlchemy 2.0.
-- **Prompt Engine:** The AI core that translates natural language into SQL and dashboard widgets using the Claude API. It handles intent classification, schema context building, query generation, and chart recommendation.
-- **Data Connectors:** A unified interface to query multiple data sources:
-  - Relational DBs: PostgreSQL, MySQL, SQLite.
-  - File Uploads: CSV, Excel, and JSON (powered by Pandas and DuckDB for in-process SQL execution).
-  - Cloud: Google Sheets via OAuth.
+- Natural-language intent classification and prompt optimization.
+- Schema-aware query generation and chart recommendations.
+- SQL validation before execution.
+- Connectors for PostgreSQL, MySQL, SQLite, CSV, Excel, JSON, DuckDB, and Google Drive/Sheets workflows.
+- Dashboard and widget management with a React grid-based canvas.
+- Authentication, database migrations, caching, rate limiting, export, and query logging foundations.
 
-### Data Flow: From Prompt to Widget
-
-1. **Intent Classification:** The user types a prompt. The system determines the intent (e.g., create a chart, show a table).
-2. **Context Building:** The schema of the selected data source is formatted compactly.
-3. **AI Generation:** Claude generates a safe SQL query and a recommended chart configuration based on the prompt and schema context.
-4. **Execution:** The SQL query is validated and executed against the target data source via the Data Connector layer.
-5. **Rendering:** The frontend receives the processed data and configuration, rendering the appropriate widget on the dashboard canvas.
-
-## 📂 Project Structure
+## Architecture
 
 ```text
-prompt-bi/
-├── backend/                 # FastAPI application
-│   ├── api/                 # Route handlers (auth, dashboards, prompts, etc.)
-│   ├── db/                  # Database engine and sessions
-│   ├── models/              # SQLAlchemy ORM models
-│   ├── schemas/             # Pydantic request/response schemas
-│   ├── services/            # Core business logic
-│   │   ├── prompt_engine/   # AI pipeline (intent, generation, building)
-│   │   └── connectors/      # Database & file adapters
-│   └── utils/               # Helpers, SQL validation, encryption
-├── frontend/                # React + TypeScript SPA
-│   └── src/
-│       ├── components/      # UI components (charts, canvas, widgets)
-│       ├── hooks/           # Custom React hooks (data query, websockets)
-│       ├── routes/          # Page views (dashboard, explore, connections)
-│       └── stores/          # Zustand state management
-├── docker-compose.yml       # Production stack orchestration
-├── docker-compose.dev.yml   # Development stack overrides
-├── backend.Dockerfile       # Backend container definition
-└── frontend.Dockerfile      # Frontend container definition
+React + TypeScript dashboard
+          │ HTTP / WebSocket
+          ▼
+FastAPI application ── auth, dashboards, widgets, queries
+          │
+          ├── Prompt engine: intent → schema context → SQL/chart suggestion
+          ├── SQL validation and audit logging
+          └── Connector layer: databases, files, and cloud sources
 ```
 
-## 🚀 Getting Started
+## Repository layout
+
+```text
+backend/
+  api/                 # HTTP routes
+  services/
+    prompt_engine/     # intent, query, chart, widget pipeline
+    connectors/        # database and file-source adapters
+  models/ schemas/     # SQLAlchemy models and Pydantic contracts
+  migrations/          # Alembic migrations
+frontend/
+  src/components/      # charts, widgets, dashboard canvas
+  src/routes/          # application views
+  src/stores/          # client state
+tests/                 # backend and integration tests
+docker-compose.yml     # local multi-service environment
+```
+
+## Technology
+
+- **Frontend:** React, TypeScript, Vite, Zustand, Recharts, react-grid-layout
+- **Backend:** Python, FastAPI, SQLAlchemy 2, Alembic
+- **Data:** PostgreSQL, MySQL, SQLite, DuckDB, CSV, Excel, JSON, Google Sheets
+- **Operations:** Docker Compose, Redis, environment-based configuration
+- **AI:** a model-backed prompt engine with explicit schema context and query validation
+
+## Run locally
 
 ### Prerequisites
 
-- Docker and Docker Compose (recommended for easiest setup)
-- Node.js 20+ (for local frontend development)
-- Python 3.11+ (for local backend development)
+- Docker and Docker Compose (recommended)
+- Node.js 20+
+- Python 3.11+
 
-### Environment Configuration
-
-Copy the example configuration file and fill in your details:
+Create a local environment file:
 
 ```bash
 cp .env.example .env
 ```
 
-Key environment variables to configure in `.env`:
-- `ANTHROPIC_API_KEY`: Your Claude API key (Required for the Prompt Engine).
-- `JWT_SECRET`: A secure random string for JWT token generation.
-- `DATABASE_URL`: Connection string for the application's PostgreSQL database.
-- `REDIS_URL`: Connection string for the Redis cache.
+Configure the database, Redis, application secrets, and the model-provider key required by the prompt engine. Do not commit `.env` files or real credentials.
 
-*(Note: Do not commit your `.env` file or hardcode credentials in your source code.)*
+Start the full stack:
 
-### 🐳 Running via Docker (Recommended)
+```bash
+docker compose up -d
+docker compose exec backend alembic upgrade head
+```
 
-1. **Launch all services** (PostgreSQL, Redis, Backend, Frontend):
-   ```bash
-   docker compose up -d
-   ```
+For active development, start PostgreSQL and Redis with `docker-compose.dev.yml`, run the FastAPI backend with `make dev`, and run the frontend with `npm run dev` from `frontend/`.
 
-2. **Apply Database Migrations**:
-   ```bash
-   docker compose exec backend alembic upgrade head
-   ```
+## Quality and safety direction
 
-3. **Access the application**: Navigate to `http://localhost`.
+This project intentionally treats text-to-SQL as a systems problem rather than a prompt-only problem. The next milestones are a public redacted demo, adversarial SQL-safety tests, a compact prompt-evaluation suite, connector contract tests, and a documented model/latency/cost evaluation.
 
-### 💻 Local Development
+## Status
 
-For active development with hot-reloading:
-
-1. **Start Infrastructure** (PostgreSQL and Redis):
-   ```bash
-   docker compose -f docker-compose.dev.yml up -d postgres redis
-   ```
-
-2. **Backend Setup**:
-   ```bash
-   # Install dependencies (ensure you are in the project root)
-   pip install -e ".[dev]"
-   
-   # Run migrations
-   make migrate # Or: alembic upgrade head
-   
-   # Start the FastAPI dev server
-   make dev     # Or: uvicorn backend.main:app --reload
-   ```
-
-3. **Frontend Setup**:
-   ```bash
-   cd frontend
-   npm install
-   npm run dev
-   ```
-
-The backend API will be available at `http://localhost:8000` (Interactive Docs at `http://localhost:8000/docs`) and the frontend at `http://localhost:5173`.
-
-## 📜 License
-
-Private — all rights reserved.
+Active portfolio project. Contributions and feedback are welcome through issues after the public contribution guide is added.
