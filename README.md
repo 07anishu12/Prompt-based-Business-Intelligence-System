@@ -81,6 +81,17 @@ docker compose exec backend alembic upgrade head
 
 For active development, start PostgreSQL and Redis with `docker-compose.dev.yml`, run the FastAPI backend with `make dev`, and run the frontend with `npm run dev` from `frontend/`.
 
+## Testing & CI/CD
+
+The platform includes a comprehensive test suite covering backend database adapters and frontend widget rendering:
+
+*   **Backend Tests:** Run with `pytest` for unit testing the schemas, db migrations, and prompt engine:
+    ```bash
+    pytest
+    ```
+*   **Integration/E2E Tests:** End-to-end user-flow tests are located in `tests/e2e/`.
+*   **Continuous Integration:** GitHub Actions runs automated pipelines (`.github/workflows/ci.yml`) to validate linting and test execution on every push or pull request.
+
 ## Quality and safety direction
 
 This project intentionally treats text-to-SQL as a systems problem rather than a prompt-only problem. The next milestones are a public redacted demo, adversarial SQL-safety tests, a compact prompt-evaluation suite, connector contract tests, and a documented model/latency/cost evaluation.
